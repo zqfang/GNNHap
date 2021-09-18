@@ -1,4 +1,6 @@
 """
+This script output mesh_nodes.pkl
+
 How to build MESH DAG network. see this paper: 
 Zhen-Hao Guo, Zhu-Hong You, De-Shuang Huang, Hai-Cheng Yi, Kai Zheng, Zhan-Heng Chen, Yan-Bin Wang, 
 MeSHHeading2vec: a new method for representing MeSH headings as vectors based on graph embedding algorithm, 

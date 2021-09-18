@@ -1,5 +1,6 @@
 import gzip, json, os, sys
-import xml.etree.ElementTree as ET 
+
+import xml.etree.cElementTree as ET
 from io import StringIO
 from Bio import Entrez
 from bioservices.uniprot import UniProt 
@@ -250,6 +251,8 @@ class MeSHXMLParser(XMLParser):
                     c['CASN1Name'] = cept.find("CASN1Name").text
                 if cept.find("RegistryNumber") is not None:
                     c['RegistryNumber'] = cept.find("RegistryNumber").text
+                if cept.find("ScopeNote") is not None:
+                    c['ScopeNote'] = cept.find("ScopeNote").text
                 if cept.find("TermList") is not None:
                     termlist = cept.findall("TermList/Term")
                     termall = []
@@ -304,9 +307,9 @@ class UniProtXMLParser(XMLParser):
         """
         Uniprot accession number
         """
-        xxml = self.uniprot.search(accession, frmt='xml')
-        self.xroot = ET.fromstring(xxml)
-        metadata = self.parse()
+        esayXML = self.uniprot.retrieve(accession, frmt='xml') # 1000X faster
+        # self.xroot = ET.fromstring(self.uniprot.search(accession, frmt='xml'))
+        metadata = self.parse(esayXML.root)
         #metadata['query_accession'] = accession
         return metadata
     
@@ -317,7 +320,7 @@ class UniProtXMLParser(XMLParser):
             metadata.update(meta)
         return metadata
             
-    def parse(self):
+    def parse(self, xroot):
         """
         If the XML input has namespaces, tags and attributes with prefixes 
         in the form prefix:sometag get expanded to {uri}sometag where the prefix 
@@ -326,7 +329,7 @@ class UniProtXMLParser(XMLParser):
         
         """
         metadata = {}
-        entries = self.xroot.findall("xmlns:entry",self.ns)
+        entries = xroot.findall("xmlns:entry",self.ns)
         for entry in entries:
             meta = {}
             name = entry.find("xmlns:name", namespaces=self.ns).text

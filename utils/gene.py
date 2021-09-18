@@ -1,4 +1,6 @@
 """
+This script output gene_nodes.pkl
+
 ## Gene names
 
 NCBI gene-info (also synonym information) files can be downloaded from ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO. For example, the human file is ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz and the mouse file is ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Mus_musculus.gene_info.gz.

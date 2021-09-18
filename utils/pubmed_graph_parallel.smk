@@ -1,7 +1,7 @@
 import glob
 import joblib
 import networkx as nx
-from pubmed import GeneMeSHGraph  
+from pubmed import GeneMeSHGraph, PubMedXMLPaser  
 from tqdm import tqdm
 
 INPUT = glob.glob("2019/*xml.gz")
@@ -28,9 +28,6 @@ rule pubmed_parser:
     #shell:
     #    "python pubmed_xml_parse.py {input} {output}"
 
-
-    
-    
 rule pubtator:
     input: 
         pub = "2019/{splits}.pkl",
@@ -40,8 +37,6 @@ rule pubtator:
         pubmed_meta = joblib.load(input.pub)
         gene_pubtator = GeneMeSHGraph.batch_pubtator(pubmed_meta)
         joblib.dump(gene_pubtator, filename=output[0])
-        
-        
         
 rule graph_build:
     input: 
