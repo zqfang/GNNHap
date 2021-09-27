@@ -34,122 +34,198 @@ import pandas as pd
 import networkx as nx
 from pubmed import MeSHXMLParser
 
-
-mesh = MeSHXMLParser("MeSH/desc2021.xml")
-mesh_nodes = mesh.parse()
-
-
-# mesh_nodes = joblib.load("mesh_nodes.pkl")
-# depth of MESH DAG
-m = 0
-tree_nums = []
-treenum2mesh = {}
-for mid, mnode in mesh_nodes.items():
-    for treenum in mnode['TreeNums']:
-        n = treenum.count(".")
-        treenum2mesh[treenum] = mid
-        tree_nums.append(treenum)
-        m = max(m, n)
+import torch
+from sentence_transformers import SentenceTransformer
+from sklearn.decomposition import PCA
 
 
-tree_nums = sorted(tree_nums) # order by literal first
-tree_nums = sorted(tree_nums, key=lambda x: len(x)) # then, order by length
+class MeshDAG:
+    def __init__(self, mesh_nodes):
+        self.mesh_nodes = mesh_nodes
+        # mesh categories/labels
+        self.cat2full = {'D':'Chemicals and Drugs',
+                            'C': 'Disease',
+                            'B': 'Organisms',
+                            'E': 'Analytical',
+                            'A': 'Anatomy',
+                            'G': 'Phenomena and Processes', 
+                            'F': 'Phychiatry and Psychology',
+                            'N': 'Health Care',
+                            'I': 'Anthropology',
+                            'Z': 'Geographicals', 
+                            'H': 'Disciplines and Occupations',
+                            'L': "Information Sciences",
+                            'M': 'Named Groups',
+                            'J': 'Technology',
+                            'V': 'Publications Charateristics',
+                            'K': 'Humanities'
+                        }
+        
+    def __call__(self, outfile=None):
+        tree_nums, treenum2mesh = self.collect_treenums()
+        tree_nums_dict, cats_depth = self.count_keys(tree_nums)
+        triplets = self.build_treenum_graph(tree_nums_dict, cats_depth)
+        self.mesh_graph = self.build_mesh_triplets(triplets, treenum2mesh, outfile)
+
+    def collect_treenums(self):
+        m = 0
+        tree_nums = []
+        treenum2mesh = {}
+        for mid, mnode in self.mesh_nodes.items():
+            for treenum in mnode['TreeNums']:
+                n = treenum.count(".")
+                treenum2mesh[treenum] = mid
+                tree_nums.append(treenum)
+                m = max(m, n)
 
 
-# count keys
-keys = set()
-cats = set()
-for num in tree_nums:
-    ndot = num.count(".")
-    cat = num[0]
-    cats.add(cat)
-    keys.add(f"{cat}-{ndot}")
+        tree_nums = sorted(tree_nums) # order by literal first
+        tree_nums = sorted(tree_nums, key=lambda x: len(x)) # then, order by length
+        return tree_nums, treenum2mesh
 
-tree_nums_dict = { key: [] for key in keys}
-cats_depth ={ cat: 0 for cat in cats}
-for num in tree_nums:
-    ndot = num.count(".")
-    cat = num[0]
-    cats_depth[cat] = max(cats_depth[cat], ndot)
-    k = f"{cat}-{ndot}"
-    tree_nums_dict[k].append(num)
+    def count_keys(self, tree_nums):
+        # count keys
+        keys = set()
+        cats = set()
+        for num in tree_nums:
+            ndot = num.count(".")
+            cat = num[0]
+            cats.add(cat)
+            keys.add(f"{cat}-{ndot}")
 
-# build graph 
-triplets = []
-for cat, depth in cats_depth.items():
-    while depth -1 >= 0: # include top level cat, e.g. A0,C1
-        k_t = f"{cat}-{depth}"
-        k_s = f"{cat}-{depth-1}"
-        tree_t = tree_nums_dict[k_t]
-        tree_s = tree_nums_dict[k_s]
-        for s in tree_s:
-            for t in tree_t:
-                # if t.find(s) != -1: # hits
-                if t[:-4] == s:
-                    triplets.append((s, cat, t))
-        depth -= 1  
+        tree_nums_dict = { key: [] for key in keys}
+        cats_depth ={ cat: 0 for cat in cats}
+        for num in tree_nums:
+            ndot = num.count(".")
+            cat = num[0]
+            cats_depth[cat] = max(cats_depth[cat], ndot)
+            k = f"{cat}-{ndot}"
+            tree_nums_dict[k].append(num)
+        return tree_nums_dict, cats_depth
 
-# convert to mesh id
-mesh_triplets = []
-for s, r, t in triplets:
-    s1 = treenum2mesh[s]
-    t1 = treenum2mesh[t]
-    mesh_triplets.append((s1, r, t1))
+    def build_treenum_graph(self, tree_nums_dict, cats_depth):
+        # build graph 
+        triplets = []
+        for cat, depth in cats_depth.items():
+            while depth -1 >= 0: # include top level cat, e.g. A0,C1
+                k_t = f"{cat}-{depth}"
+                k_s = f"{cat}-{depth-1}"
+                tree_t = tree_nums_dict[k_t]
+                tree_s = tree_nums_dict[k_s]
+                for s in tree_s:
+                    for t in tree_t:
+                        # if t.find(s) != -1: # hits
+                        if t[:-4] == s:
+                            triplets.append((s, cat, t))
+                depth -= 1  
+        return triplets
 
-mesh_graph = pd.DataFrame(mesh_triplets, columns=['source','relation','target'])
-mesh_graph.to_csv("mesh_edges_20210901.csv", index=False)
+    def build_mesh_triplets(self, triplets, treenum2mesh, outfile=None):
+        # convert to mesh id
+        mesh_triplets = []
+        for s, r, t in triplets:
+            s1 = treenum2mesh[s]
+            t1 = treenum2mesh[t]
+            mesh_triplets.append((s1, r, t1))
 
-
-# mesh categories/labels
-cat2full = {'D':'Chemicals and Drugs','C':'Disease','B':'Organisms','E':'Analytical',
-            'A': 'Anatomy','G': 'Phenomena and Processes', 'F':'Phychiatry and Psychology','N':'Health Care',
-           'I': 'Anthropology','Z': 'Geographicals', 'H':'Disciplines and Occupations',
-            'L': "Information Sciences",'M':'Named Groups','J':'Technology','V':'Publications Charateristics','K':'Humanities'}
-
-for mid, mnode in mesh_nodes.items():
-    mnode['lables'] = set()
-    for t in mnode['TreeNums']:
-        mnode['lables'].add(t[0])
-
-num_cats = {k: 0 for k in cats}
-for mid, mnode in mesh_nodes.items():
-    mnode['lables'] = set()
-    for t in mnode['TreeNums']:
-        mnode['lables'].add(t[0])
-        num_cats[t[0]] += 1
-
-fig1, ax1 = plt.subplots(figsize=(5,4))
-pie = pd.Series(num_cats)
-labels = [l +": "+ cat2full[l]for l in pie.index.to_list()]
-ax1.pie(pie.values, labels=pie.index.values, autopct='%1.1f%%', shadow=True, startangle=90)
-ax1.legend(labels, bbox_to_anchor=(0.9, 1))
-ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-plt.show()
+        mesh_graph = pd.DataFrame(mesh_triplets, columns=['source','relation','target'])
+        if outfile is not None:
+            mesh_graph.to_csv(outfile, index=False)
+        return mesh_graph
 
 
-## generate vector representation of nodes of a graph
-from node2vec import Node2Vec
-# Generate walks
-n2v = Node2Vec(H, dimensions=64, #walk_length=20, p=0.25,q=4,
-               num_walks=50, workers=16, weight_key='weight', seed=88)
-# train node2vec model
-n2w_model = n2v.fit(window=7, min_count=1, iter=3)
+
+class SequenceEncoder(object):
+    def __init__(self, model_name='gsarti/scibert-nli', device=None):
+        self.device = device
+        self.model = SentenceTransformer(model_name, device=device)
+
+    @torch.no_grad()
+    def __call__(self, df):
+        if isinstance(df, pd.Series):
+            inp = df.values
+        else:
+            inp = df
+        x = self.model.encode(inp, show_progress_bar=False, 
+                              convert_to_numpy=True,
+                              #convert_to_tensor=True, 
+                              device=self.device)
+        return x
+    
+    def output_dim(self, output_size):
+        #Compute PCA on the train embeddings matrix
+        pca = PCA(n_components=output_size)
+        pca.fit(x)
+        pca_comp = np.asarray(pca.components_)
+
+        # We add a dense layer to the model, so that it will produce directly embeddings with the new size
+        dense = self.models.Dense(in_features=model.get_sentence_embedding_dimension(), 
+                                  out_features=output_size, bias=False, 
+                                  activation_function=torch.nn.Identity())
+        dense.linear.weight = torch.nn.Parameter(torch.tensor(pca_comp))
+        self.model.add_module('dense', dense)
 
 
-# Save embeddings for later use
-n2w_model.wv.save_word2vec_format("mesh.node2vec.embed")
+if __name__ == "__main__":
 
-embeddings = pd.read_table("mesh.node2vec.embed", skiprows=1, index_col=0, sep=" ", header=None)
+    mesh = MeSHXMLParser("MeSH/desc2021.xml")
+    mesh_nodes = mesh.parse()
+    mg = MeshDAG(mesh_nodes)
+    mesh_graph = mg("mesh_graph.csv")
+    # embeddings
+    mesh_encoder = SequenceEncoder( device='cpu') # model_name='sentence-transformers/allenai-specter'
+    # print("Max Sequence Length:", model.max_seq_length)
+    ##Change the length to 200
+    #model.max_seq_length = 200
 
-from sklearn.manifold import TSNE
-tsne_embed = TSNE(n_components=2).fit_transform(embeddings)
+    # Note SeuqneceEncoder has max_seq_length. sentence > max_seq_leght will be trucated
+    mesh_id = []
+    mesh_sentences = []
+    mesh_embeds = []
+    for m, mnode in mesh_nodes.items():
+        concepts = mnode['Concept']
+        # mnode['embeds'] = []
+        mesh_id.append(m)
+        s = []
+        for cpt in concepts:
+            if 'ScopeNote' not in cpt: continue
+            sentence = cpt['ScopeNote'].strip()
+            s.append(sentence)
+        if len(s) == 0:
+            s.append(mnode['DescriptorName'])
+        # max length
+        mesh_sentences.append(s)
+        embed = mesh_encoder(s)
+        mesh_embeds.append(embed.mean(axis=0))
 
-embeddings['cato'] = [ list(mesh_nodes[m]['lables'])[0] for m in embeddings.index.to_list()]
+        
+    mesh_embed2 = pd.DataFrame(mesh_embeds, index = mesh_id)
+    mesh_embed2.to_csv("mesh.sentencetransformer.embed.csv")
 
-fig, ax = plt.subplots(figsize=(5,5))
-for cat in pie.index:
-    mask = embeddings['cato'] == cat
-    ax.scatter(tsne_embed[mask,0], tsne_embed[mask,1], label=cat )
-ax.legend(bbox_to_anchor=(1.1, 0.7, 0.1,0.3))
-ax.set_title("Mesh categories")
-plt.show()
+    # visulization
+    # mesh categories/labels
+    cat2full = {'D':'Chemicals and Drugs','C':'Disease','B':'Organisms','E':'Analytical',
+                'A': 'Anatomy','G': 'Phenomena and Processes', 'F':'Phychiatry and Psychology','N':'Health Care',
+            'I': 'Anthropology','Z': 'Geographicals', 'H':'Disciplines and Occupations',
+                'L': "Information Sciences",'M':'Named Groups','J':'Technology','V':'Publications Charateristics','K':'Humanities'}
+
+    for mid, mnode in mesh_nodes.items():
+        mnode['lables'] = set()
+        for t in mnode['TreeNums']:
+            mnode['lables'].add(t[0])
+
+    num_cats = {k: 0 for k in cats}
+    for mid, mnode in mesh_nodes.items():
+        mnode['lables'] = set()
+        for t in mnode['TreeNums']:
+            mnode['lables'].add(t[0])
+            num_cats[t[0]] += 1
+
+    fig1, ax1 = plt.subplots(figsize=(5,4))
+    pie = pd.Series(num_cats)
+    labels = [l +": "+ cat2full[l]for l in pie.index.to_list()]
+    ax1.pie(pie.values, labels=pie.index.values, autopct='%1.1f%%', shadow=True, startangle=90)
+    ax1.legend(labels, bbox_to_anchor=(0.9, 1))
+    ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+    plt.show()
+

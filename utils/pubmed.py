@@ -283,18 +283,8 @@ class UniProtXMLParser(XMLParser):
            "xsi":"http://www.w3.org/2001/XMLSchema-instance",
            "schemaLocation":"http://uniprot.org/uniprot http://www.uniprot.org/support/docs/uniprot.xsd"}
         self.uniprot = UniProt()
-        # if xml is None: return      
-        # if xml.endswith(".gz"):
-        #     xml_handle = gzip.open(xml,'r')
-        # else:
-        #     xml_handle = open(xml,'r')
-
-        # xtree = ET.parse(xml_handle)
-        # self.xroot = xtree.getroot()
-        # xml_handle.close() 
-
-        
-    def mapping(self, fr="P_ENTREZGENEID", to='ID',query=['11302','11304']):
+       
+    def mapping(self, fr="P_ENTREZGENEID", to='ID', query=['11302','11304']):
         """
         see self.uniprot._mapping
         """
@@ -302,6 +292,10 @@ class UniProtXMLParser(XMLParser):
         self.maps = self.uniprot.mapping(fr=fr, to=to, query=query)
         # get the first entry is enought
         return self.maps
+
+    def get_fasta_sequence(self, accession):
+        fasta = self.uniprot.get_fasta_sequence(accession)
+        return fasta
     
     def search(self, accession):
         """
@@ -311,12 +305,14 @@ class UniProtXMLParser(XMLParser):
         # self.xroot = ET.fromstring(self.uniprot.search(accession, frmt='xml'))
         metadata = self.parse(esayXML.root)
         #metadata['query_accession'] = accession
-        return metadata
+        fasta = self.uniprot.get_fasta_sequence(accession)
+        return metadata, fasta
     
     def searchall(self, accessions: list):
         metadata = {}
         for acc in accessions:
-            meta = self.search(acc)
+            meta, fasta = self.search(acc)
+            meta['protein_sequences'] = fasta
             metadata.update(meta)
         return metadata
             
@@ -334,12 +330,13 @@ class UniProtXMLParser(XMLParser):
             meta = {}
             name = entry.find("xmlns:name", namespaces=self.ns).text
             meta['name'] = name
+            meta['function'] = entry.find("xmlns:comment[@type='function']/xmlns:text", self.ns).text
             meta['accession'] = [a.text for a in entry.findall("xmlns:accession",self.ns) ]
             meta['gene_names'] =[g.text for g in  entry.findall("xmlns:gene/xmlns:name", self.ns)]
             protein = entry.find("xmlns:protein",self.ns)
-            p_fullname = [ p.text for p in protein.findall("xmlns:recommendedName/xmlns:fullName", self.ns) ]
-            p_altnames = [ p.text for p in protein.findall("xmlns:alternativeName/xmlns:fullName", self.ns) ]
-            p_shortnames = [ p.text for p in protein.findall("xmlns:alternativeName/xmlns:shortName", self.ns) ]
+            p_fullname = [ p.text for p in protein.findall("xmlns:recommendedname/xmlns:fullname", self.ns) ]
+            p_altnames = [ p.text for p in protein.findall("xmlns:alternativename/xmlns:fullname", self.ns) ]
+            p_shortnames = [ p.text for p in protein.findall("xmlns:alternativename/xmlns:shortname", self.ns) ]
             meta['protein_names'] = p_fullname + p_altnames + p_shortnames
             meta['organism'] = entry.find('xmlns:organism/xmlns:name[@type="scientific"]', self.ns).text
             metadata[name] = meta
@@ -807,7 +804,7 @@ class GeneMeSHGraph(object):
         return networkX formated Graph
         """
         
-        G = nx.Graph()
+        G = nx.MultiGraph()
         for gid, gnode in self.gene_nodes.items():
             if "_gene_merge" in gnode:
                 del gnode['_gene_merge']
@@ -816,12 +813,15 @@ class GeneMeSHGraph(object):
             # Add nodes with the node attribute "bipartite" for bipartite graph
             gnode['bipartite'] = 0
             gnode['weight'] = len(gnode['PMIDs'])
+            gnode['node_type'] = 'gene'
             G.add_node(gid, **gnode)
 
         for mid, mnode in self.mesh_nodes.items():
             mnode['bipartite'] = 1
             mnode['weight'] = len(mnode['PMIDs'])
+            mnode['node_type'] = 'mesh'
             G.add_node(mid, **mnode)
+            
         for e in self.edges:
             G.add_edge(e['gene_node'], e['mesh_node'], weight=e['weight'],PMIDs=e['PMIDs'])
         

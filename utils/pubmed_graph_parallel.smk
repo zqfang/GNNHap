@@ -6,10 +6,11 @@ from tqdm import tqdm
 
 INPUT = glob.glob("2019/*xml.gz")
 OUTPUT = [xml.replace("xml.gz", "pkl") for xml in INPUT]
-GRAPHS = [xml.replace("xml.gz", "graph.pkl") for xml in INPUT]
+GRAPHS = [xml.replace("xml.gz", "human.graph.pkl") for xml in INPUT]
 PUBS = [xml.split("/")[-1].replace(".xml.gz", "") for xml in INPUT]
 PUBTATOR = expand("2019/pubtator/{splits}.pubtator.pkl", splits=PUBS)
-WHOLE_GRAPH = "gene_mesh_final.pkl"
+PUBMETA = expand("2019/{splits}.meta.pkl", splits=PUBS)
+WHOLE_GRAPH = "human_gene_mesh_networkx.pkl"
 
 
 ###### rules ###############
@@ -17,35 +18,35 @@ rule target:
     input: WHOLE_GRAPH
     
     
-rule pubmed_parser:
-    input: "2019/{splits}.xml.gz"
-    output: "2019/{splits}.pkl"
-    run:
-        pubmed = PubMedXMLPaser(input[0])
-        meta = pubmed.parse()
-        joblib.dump(meta, output[0])
+# rule pubmed_parser:
+#     input: "2019/{splits}.xml.gz"
+#     output: "2019/{splits}.meta.pkl"
+#     run:
+#         pubmed = PubMedXMLPaser(input[0])
+#         meta = pubmed.parse()
+#         joblib.dump(meta, output[0])
     
-    #shell:
-    #    "python pubmed_xml_parse.py {input} {output}"
+#     #shell:
+#     #    "python pubmed_xml_parse.py {input} {output}"
 
-rule pubtator:
-    input: 
-        pub = "2019/{splits}.pkl",
-    output:
-        "2019/pubtator/{splits}.pubtator.pkl"
-    run:
-        pubmed_meta = joblib.load(input.pub)
-        gene_pubtator = GeneMeSHGraph.batch_pubtator(pubmed_meta)
-        joblib.dump(gene_pubtator, filename=output[0])
+# rule pubtator:
+#     input: 
+#         pub = "2019/{splits}.meta.pkl",
+#     output:
+#         "2019/pubtator/{splits}.pubtator.pkl"
+#     run:
+#         pubmed_meta = joblib.load(input.pub)
+#         gene_pubtator = GeneMeSHGraph.batch_pubtator(pubmed_meta)
+#         joblib.dump(gene_pubtator, filename=output[0])
         
 rule graph_build:
     input: 
-        pub="2019/{splits}.pkl",
+        pub="2019/{splits}.meta.pkl",
         pubtator = "2019/pubtator/{splits}.pubtator.pkl",
         mesh="mesh_nodes.pkl",
-        gene="gene_nodes.pkl"
+        gene="human_gene_nodes.pkl"
     output:
-        "2019/{splits}.graph.pkl"
+        "2019/{splits}.human.graph.pkl"
     run:
         gene_nodes = joblib.load(input.gene)
         mesh_nodes = joblib.load(input.mesh)
@@ -59,7 +60,7 @@ rule graph_build:
                 
 rule graph_agg:
     input: GRAPHS
-    output: "gene_mesh_noedge.pkl"
+    output: "human.gene_mesh_noedge.pkl"
     run:
         G0 = joblib.load(input[0])
         for inp in tqdm(input[1:]):
@@ -73,13 +74,15 @@ rule graph_agg:
 
 
 rule graph_build_edge:
-    input: "gene_mesh_noedge.pkl"
-    output: "gene_mesh_final.pkl"
+    input: "human.gene_mesh_noedge.pkl"
+    output: 
+        "human_gene_mesh_dict.pkl",
+        "human_gene_mesh_networkx.pkl",
     run:
         G0 = joblib.load(input[0])
         G0.edge_add() # take a few hours to run
         joblib.dump(G0, filename=output[0])
         G = G0.to_networkx()
-        nx.write_gpickle(G, path="gene_mesh_networkx.pkl")
+        nx.write_gpickle(G, path=output[1])
 
         
