@@ -16,6 +16,9 @@ from data import GeneMeshData
 from models import HeteroGNN
 from utils import add_train_args
 
+
+# device
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 # argument parser
 args = add_train_args()
 torch.manual_seed(seed=123456)
@@ -24,7 +27,7 @@ os.makedirs(args.outdir, exist_ok=True)
 tb = SummaryWriter(log_dir = args.outdir)
 # read data in
 print("Read graph data")
-H = nx.read_gpickle(args.gene_mesh_nx_graph) # note: H is undirected multigraph
+H = nx.read_gpickle(args.gene_mesh_graph) # note: H is undirected multigraph
 
 # Load mesh embeddings
 print("Load embeddings")
@@ -48,8 +51,8 @@ gm_data = gm()
 train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
                                          add_negative_train_samples=True, 
                                          neg_sampling_ratio=1.0,
-                                         edge_type=('gene','genemesh','mesh'), # must be tuple, not list
-                                         rev_edge_type=('mesh','rev_genemesh','gene'))(gm_data)
+                                         edge_types=('gene','genemesh','mesh'), # must be tuple, not list
+                                         rev_edge_types=('mesh','rev_genemesh','gene'))(gm_data)
 
 joblib.dump(train_data, filename=os.path.join(args.outdir,"train.data.pkl"))
 joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
@@ -57,19 +60,19 @@ joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
 
 # init model
 model = HeteroGNN(heterodata=gm_data, hidden_channels=256, num_layers=2)
-# Initialize lazy modules
-with torch.no_grad():  
-    out = model(test_data.x_dict, test_data.edge_index_dict)
+# # Initialize lazy modules
+# with torch.no_grad():  
+#     out = model(test_data.x_dict, test_data.edge_index_dict)
 
 # config
-optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=1e-4)
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [200, 500, 800], gamma=0.5)
-model.to('cpu')
+model.to(device)
 
 @torch.no_grad()
-def valid(data: HeteroData):
+def valid(data: HeteroData, device='cpu'):
     model.eval()
-    data.to('cpu')
+    data.to(device)
     out = model(data.x_dict, data.edge_index_dict)
     y_score = model.distmult(out, data.edge_label_index_dict)
     y_true = data.edge_label_dict[('gene','genemesh','mesh')]
@@ -86,7 +89,7 @@ del gm_data
 
 ## Trainining
 best_val_loss = np.Inf
-train_data.to('cpu')
+train_data.to(device)
 
 print("Start training")
 for epoch in range(1, 1001):
@@ -101,13 +104,18 @@ for epoch in range(1, 1001):
     val_loss, aupr, auroc = valid(val_data)  
     print(f'Epoch: {epoch:03d}, Train Loss: {train_loss:.7f}, Val Loss: {val_loss:.7f}, Val ROC: {auroc: .4f}, Val PR: {aupr:.3f}')
     tb.add_scalar('Train/loss', train_loss, epoch) 
-    tb.add_scalars('Valid', {'loss': val_loss,
-                              'val_pr': aupr,
-                              'val_roc': auroc}, epoch) 
+    tb.add_scalar('Valid/loss', val_loss, epoch) 
+    tb.add_scalar('Valid/pr', aupr, epoch) 
+    tb.add_scalar('Valid/roc', auroc, epoch) 
+
     if val_loss <= best_val_loss:
         best_val_loss = val_loss
         best_epoch = epoch
         torch.save({'state_dict': model.state_dict(),
                     'best_epoch': epoch}, 
-                    os.path.join(args.outdir, 'human_gene_mesh_best_model.pt'))
+                    os.path.join(args.outdir, 'gene_mesh_best_model.pt'))
+    if epoch % 100 == 0:
+        torch.save({'state_dict': model.state_dict(),
+            'best_epoch': epoch}, 
+            os.path.join(args.outdir, f'gene_mesh_epoch_{epoch}_model.pt'))
 tb.close()

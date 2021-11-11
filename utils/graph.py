@@ -35,24 +35,16 @@ for inode in  isonodes:
         print(inode)
 # only genes has isolated nodes
 
-
-# In[11]:
 # remove isolated nodes
 H.remove_nodes_from(list(nx.isolates(H)))
 H.number_of_nodes()
 
-
-
-# In[17]:
 # Load mesh embeddings
 mesh_features = pd.read_csv("mesh.sentencetransformer.embed.csv", index_col=0)
 gene_features = pd.read_csv("human_gene_unirep.embeb.csv",index_col=0, header=None)
 
-
-# In[56]:
 gene_features.index = gene_features.index.astype(str)
 
-# In[70]:
 
 class GeneMeshData:
     """
@@ -230,16 +222,13 @@ class GeneMeshData:
                 #self.data['mesh', edge_type, 'mesh'].edge_attr = edge_attr
 
 
-# In[71]:
+
 
 
 gm = GeneMeshData(H, gene_features, mesh_features)
 
 # align 
 gm_data = gm()
-
-# In[80]:
-
 
 train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
                                          add_negative_train_samples=True, 
@@ -326,8 +315,6 @@ class HeteroGNN(torch.nn.Module):
 
 model = HeteroGNN(heterodata=gm_data, hidden_channels=256, num_layers=2)
 
-
-# In[84]:
 
 
 with torch.no_grad():  # Initialize lazy modules.

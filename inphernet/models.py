@@ -11,12 +11,22 @@ class HeteroGNN(torch.nn.Module):
                        hidden_channels: int, num_layers: int = 2):
         super().__init__()
         _edge_types = heterodata.edge_types
+        self.node_types = heterodata.node_types
         # dense layer
         self.lin_dict = torch.nn.ModuleDict()
-        for node_type in heterodata.node_types:
-            self.lin_dict[node_type] = torch.nn.Sequential(Linear(-1, hidden_channels),    
-                                                           torch.nn.BatchNorm1d(hidden_channels),
-                                                           torch.nn.ReLU())
+        self.lin_dict2 = torch.nn.ModuleDict()
+        for node_type in self.node_types:
+            if node_type == "mesh": 
+                in_channel = 768
+            elif node_type == "gene":
+                in_channel = 1900
+            self.lin_dict[node_type] = torch.nn.Sequential(torch.nn.Linear(in_channel,hidden_channels),    
+                                        torch.nn.BatchNorm1d(hidden_channels),
+                                        torch.nn.ReLU())
+            self.lin_dict2[node_type] = torch.nn.Sequential(torch.nn.Linear(hidden_channels, hidden_channels),    
+                                        torch.nn.BatchNorm1d(hidden_channels),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(hidden_channels, hidden_channels))
         # hetero convolute (gene --> mesh, mesh --> gene)
         self.gene_mesh_convs = torch.nn.ModuleList()
         for _ in range(num_layers):
@@ -42,12 +52,6 @@ class HeteroGNN(torch.nn.Module):
             self.convs.append(mconv)
             #self.gene_convs.append(gconv)
             
-        self.lin_dict2 = torch.nn.ModuleDict()
-        for node_type in heterodata.node_types: 
-            self.lin_dict2[node_type] = torch.nn.Sequential(torch.nn.Linear(hidden_channels, hidden_channels),    
-                                        torch.nn.BatchNorm1d(hidden_channels),
-                                        torch.nn.ReLU(),
-                                        torch.nn.Linear(hidden_channels, hidden_channels))
         #self.loss_fn = torch.nn.BCEWithLogitsLoss()    
     def forward(self, x_dict, edge_index_dict):
         # linear + relu + bn
@@ -81,3 +85,38 @@ class HeteroGNN(torch.nn.Module):
         #p = torch.sigmoid(score)
         #loss = self.loss_fn(score, target))
         return torch.nn.functional.binary_cross_entropy_with_logits(score, target)
+
+
+
+# Model1
+class LogisticRegression(torch.nn.Module):
+    def __init__(self, input_size):
+        super(LogisticRegression, self).__init__()
+        self.linear = torch.nn.Linear(input_size, 1)
+    
+    def forward(self, x):
+        out = self.linear(x)
+        # Batch, C, W, H
+        return out.view(-1)
+    
+
+
+    
+# model 2: multiPercepton
+class MLP(torch.nn.Module):
+    def __init__(self, input_size):
+        super(MLP,self).__init__()
+        # number of hidden nodes in each layer (512)
+        # input_size = 1900 + 768
+        hidden_1 = 1024
+        hidden_2 = 512
+        self.mlp = torch.nn.Sequential(torch.nn.Linear(input_size, hidden_1),    
+                                    torch.nn.BatchNorm1d(hidden_1),
+                                    torch.nn.ReLU(),
+                                    torch.nn.Linear(hidden_1, hidden_2),
+                                    torch.nn.ReLU(),
+                                    torch.nn.Dropout(0.2),
+                                    torch.nn.Linear(hidden_2, 1)) 
+    def forward(self,x):
+        return self.mlp(x).view(-1) # squeeze last dim
+    

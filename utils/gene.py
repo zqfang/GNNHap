@@ -13,17 +13,32 @@ Explain: https://www.ncbi.nlm.nih.gov/books/NBK3840/
 
 Here is a R package to get all synonym (alias) names: https://github.com/oganm/geneSynonym
 
+Protein Sequences:
+Human:
+    ftp://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh38_latest/refseq_identifiers/GRCh38_latest_protein.faa.gz
+Mouse:
+    ftp://ftp.ncbi.nlm.nih.gov/refseq/M_musculus/annotation_releases/108/GCF_000001635.26_GRCm38.p6/GCF_000001635.26_GRCm38.p6_protein.faa.gz  
+
 """
+import sys, os
+import joblib
 import pandas as pd
 from Bio import SeqIO
 from jax_unirep import get_reps
 from pubmed import UniProtXMLParser
+from gseapy.parser import Biomart
 
-# protein sequences
-proteins = SeqIO.parse("GRCh38_latest_protein.faa", "fasta")
-# 2nd way to get gene alias
-genes = pd.read_table("Homo_sapiens.gene_info.gzz")  
+### Input 
+AA_SEQ = "GRCh38_latest_protein.faa"
+GENE_INFO = "Homo_sapiens.gene_info.gz"
 
+### Output
+OUT_AA_EMBED = "human_gene_unirep.embeb.csv"
+OUT_GENE_NODES = "human_gene_nodes.pkl"
+
+## Start
+# way to get gene alias
+genes = pd.read_table(GENE_INFO)
 # we only interested in protein-coding genes
 protein_coding = genes[genes.type_of_gene == "protein-coding"]
 
@@ -34,11 +49,9 @@ gene_nodes = {}
 for g, alias, symbol in zip(gene_id, gene_alias, protein_coding.Symbol.to_list()):
     gene_nodes[g] = {'gene_symbol': symbol, 'gene_synonyms': alias }
 
-
-
+## get mapping and alias ...
 uxp = UniProtXMLParser()
 geneid2uniprot = uxp.mapping(fr='P_ENTREZGENEID', to='ID', query=gene_id)
-
 
 # take a long time to run, paralle processing better
 for geneid, uniprot_ids in geneid2uniprot.items():
@@ -65,12 +78,10 @@ for gid, data in gene_nodes.items():
     if '-' in data['gene_synonyms']:
         data['gene_synonyms'].pop(data['gene_synonyms'].index("-"))
 
-joblib.dump(gene_nodes, filename="gene_nodes.pkl")
+# Save gene nodes information
+joblib.dump(gene_nodes, filename="human_gene_nodes.pkl")
 
-
-
-# get embedding
-from gseapy.parser import Biomart
+## Map refseq protein ids
 bm = Biomart()
 attrs = bm.get_attributes(dataset='hsapiens_gene_ensembl') 
 filters = bm.get_filters(dataset='hsapiens_gene_ensembl')
@@ -83,9 +94,9 @@ results = bm.query(dataset='hsapiens_gene_ensembl',
 
 results.dropna()['entrezgene_id'].nunique()
 
-
+## read AA sequences
 prot_df = []
-for seq_record in SeqIO.parse("GRCh38_latest_protein.faa", "fasta"):
+for seq_record in SeqIO.parse(AA_SEQ, "fasta"):
     prot_df.append((seq_record.id, str(seq_record.seq)))
 prot_df = pd.DataFrame(prot_df, columns=['prot_id','peptide'])
 results = results.drop_duplicates().dropna()
@@ -96,7 +107,7 @@ res = res.dropna()
 # only select AA with max sequence length
 AA = res.groupby(['entrezgene_id'])['peptide'].agg(lambda x: x.loc[x.str.len().idxmax()])
 
-
+## get AA embedding
 h_avg, h_final, c_final= get_reps(AA.to_list(), mlstm_size=1900)
 prot_embed = pd.DataFrame(h_avg, index=AA.index)
-prot_embed.to_csv("human_gene_unirep.embeb.csv")
+prot_embed.to_csv(OUT_AA_EMBED) # row index is entrez id

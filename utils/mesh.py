@@ -1,37 +1,40 @@
 """
 This script output mesh_nodes.pkl
 
-How to build MESH DAG network. see this paper: 
-Zhen-Hao Guo, Zhu-Hong You, De-Shuang Huang, Hai-Cheng Yi, Kai Zheng, Zhan-Heng Chen, Yan-Bin Wang, 
-MeSHHeading2vec: a new method for representing MeSH headings as vectors based on graph embedding algorithm, 
-Briefings in Bioinformatics, , bbaa037, https://doi.org/10.1093/bib/bbaa037
+How to build MESH DAG network. see this paper: https://doi.org/10.1093/bib/bbaa037
 
 
+The MeSH consists of three parts including Main Headings, Qualifiers and Supplementary Concepts. 
+- Main Headings as the trunk of MeSH are used to describe the content or theme of the article. 
+- Qualifiers is the refinement of MeSH headings, i.e. how to be processed when it is in a specific area. 
+- Supplementary Concept is a complementary addition that is mostly related to drugs and chemistry. 
 
-
-The MeSH consists of three parts including Main Headings, Qualifiers and Supplementary Concepts. Main Headings as the trunk of MeSH are used to describe the content or theme of the article. Qualifiers is the refinement of MeSH headings, i.e. how to be processed when it is in a specific area. Supplementary Concept is a complementary addition that is mostly related to drugs and chemistry. 
-
-In MeSH tree structure, MeSH headings are organized as a ‘tree’ with 16 top categories in which the higher hierarchy has the broader meaning and the lower hierarchy has the specific meaning
-
+In MeSH tree structure, MeSH headings are organized as a ‘tree’ with 16 top categories 
+in which the higher hierarchy has the broader meaning and the lower hierarchy has the specific meaning
 Hence, we construct the MeSH heading relationship network from tree structure through hierarchical tree num rules.
 
 
+Each MeSH heading can be described by one or more tree nums to reflect its hierarchy in the tree structure and relationships with other MeSH headings. 
+Tree num consists of letters and numbers:
+- The first of which is uppercase letter representing category and the rest are made up of numbers. 
+- The first two digits are fixed design following the first capital letter and can be seen the top category except capital letter.
+- Each three digits represent a hierarchy in the tree structure. 
 
-Each MeSH heading can be described by one or more tree nums to reflect its hierarchy in the tree structure and relationships with other MeSH headings. Tree num consists of letters and numbers, the first of which is uppercase letter representing category and the rest are made up of numbers. The first two digits are fixed design following the first capital letter and can be seen the top category except capital letter.
+There are some MeSH headings such as Lung Neoplasms (C04.588.894.797.520, C08.381.540, and C08.785.520) 
+that are described by a single type of tree num, while others such as 
+Reflex (E01.370.376.550.650, E01.370.600.550.650, F02.830.702 and G11.561.731) 
+can be represented by different kinds of tree num.
 
-
- Each three digits represent a hierarchy in the tree structure. There are some MeSH headings such as Lung Neoplasms (C04.588.894.797.520, C08.381.540, and C08.785.520) that are described by a single type of tree num, while others such as Reflex (E01.370.376.550.650, E01.370.600.550.650, F02.830.702 and G11.561.731) can be represented by different kinds of tree num.
-
-Whenever the last hierarchy of tree num is removed, a new tree num and corresponding MeSH heading can be generated and contacted.
-
-
- For the sake of simplicity, we treat the mode of the tree num category of MeSH heading as its label.
-
+Whenever the last hierarchy of tree num is removed, 
+a new tree num and corresponding MeSH heading can be generated and contacted.
+For the sake of simplicity, we treat the mode of the tree num category of MeSH heading as its label.
+However, we don't use node label in our GNN model
 """
-
+import os, sys, joblib
 import numpy as np
 import pandas as pd
 import networkx as nx
+import matplotlib.pyplot as plt
 from pubmed import MeSHXMLParser
 
 import torch
@@ -159,7 +162,7 @@ class SequenceEncoder(object):
         pca_comp = np.asarray(pca.components_)
 
         # We add a dense layer to the model, so that it will produce directly embeddings with the new size
-        dense = self.models.Dense(in_features=model.get_sentence_embedding_dimension(), 
+        dense = self.models.Dense(in_features=self.model.get_sentence_embedding_dimension(), 
                                   out_features=output_size, bias=False, 
                                   activation_function=torch.nn.Identity())
         dense.linear.weight = torch.nn.Parameter(torch.tensor(pca_comp))
@@ -167,11 +170,17 @@ class SequenceEncoder(object):
 
 
 if __name__ == "__main__":
+    ## Input 
+    MESH_XML = "MeSH/desc2021.xml"
+    ## Output
+    OUT_MESH_GRAPH = "mesh_graph.csv"
+    OUT_MESH_EMBED = "mesh.sentencetransformer.embed.csv"
 
-    mesh = MeSHXMLParser("MeSH/desc2021.xml")
+    # get started
+    mesh = MeSHXMLParser(MESH_XML)
     mesh_nodes = mesh.parse()
     mg = MeshDAG(mesh_nodes)
-    mesh_graph = mg("mesh_graph.csv")
+    mesh_graph = mg(outfile=OUT_MESH_GRAPH)
     # embeddings
     mesh_encoder = SequenceEncoder( device='cpu') # model_name='sentence-transformers/allenai-specter'
     # print("Max Sequence Length:", model.max_seq_length)
@@ -198,34 +207,45 @@ if __name__ == "__main__":
         embed = mesh_encoder(s)
         mesh_embeds.append(embed.mean(axis=0))
 
-        
     mesh_embed2 = pd.DataFrame(mesh_embeds, index = mesh_id)
-    mesh_embed2.to_csv("mesh.sentencetransformer.embed.csv")
+    mesh_embed2.to_csv(OUT_MESH_EMBED)
 
-    # visulization
-    # mesh categories/labels
-    cat2full = {'D':'Chemicals and Drugs','C':'Disease','B':'Organisms','E':'Analytical',
-                'A': 'Anatomy','G': 'Phenomena and Processes', 'F':'Phychiatry and Psychology','N':'Health Care',
-            'I': 'Anthropology','Z': 'Geographicals', 'H':'Disciplines and Occupations',
-                'L': "Information Sciences",'M':'Named Groups','J':'Technology','V':'Publications Charateristics','K':'Humanities'}
+    # # visulization
+    # # mesh categories/labels
+    # cat2full = {'D':'Chemicals and Drugs',
+    #             'C':'Disease', 
+    #             'B':'Organisms',
+    #             'E':'Analytical',
+    #             'A': 'Anatomy',
+    #             'G': 'Phenomena and Processes',
+    #             'F':'Phychiatry and Psychology',
+    #             'N':'Health Care',
+    #             'I': 'Anthropology',
+    #             'Z': 'Geographicals',
+    #             'H':'Disciplines and Occupations',
+    #             'L': "Information Sciences",
+    #             'M':'Named Groups',
+    #             'J':'Technology',
+    #             'V':'Publications Charateristics',
+    #             'K':'Humanities'}
 
-    for mid, mnode in mesh_nodes.items():
-        mnode['lables'] = set()
-        for t in mnode['TreeNums']:
-            mnode['lables'].add(t[0])
+    # for mid, mnode in mesh_nodes.items():
+    #     mnode['lables'] = set()
+    #     for t in mnode['TreeNums']:
+    #         mnode['lables'].add(t[0])
 
-    num_cats = {k: 0 for k in cats}
-    for mid, mnode in mesh_nodes.items():
-        mnode['lables'] = set()
-        for t in mnode['TreeNums']:
-            mnode['lables'].add(t[0])
-            num_cats[t[0]] += 1
+    # num_cats = {k: 0 for k in cats}
+    # for mid, mnode in mesh_nodes.items():
+    #     mnode['lables'] = set()
+    #     for t in mnode['TreeNums']:
+    #         mnode['lables'].add(t[0])
+    #         num_cats[t[0]] += 1
 
-    fig1, ax1 = plt.subplots(figsize=(5,4))
-    pie = pd.Series(num_cats)
-    labels = [l +": "+ cat2full[l]for l in pie.index.to_list()]
-    ax1.pie(pie.values, labels=pie.index.values, autopct='%1.1f%%', shadow=True, startangle=90)
-    ax1.legend(labels, bbox_to_anchor=(0.9, 1))
-    ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-    plt.show()
+    # fig1, ax1 = plt.subplots(figsize=(5,4))
+    # pie = pd.Series(num_cats)
+    # labels = [l +": "+ cat2full[l]for l in pie.index.to_list()]
+    # ax1.pie(pie.values, labels=pie.index.values, autopct='%1.1f%%', shadow=True, startangle=90)
+    # ax1.legend(labels, bbox_to_anchor=(0.9, 1))
+    # ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+    # plt.show()
 
