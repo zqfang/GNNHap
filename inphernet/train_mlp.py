@@ -115,7 +115,7 @@ for epoch in range(epoch_start, num_epochs):
         # print statistics
         train_loss += loss.item()
         #if (i) % 500 == 499:    # print every 500 mini-batches
-        print('Current Time = %s, [%d, %5d] loss: %.7f' %
+        print('%s, epoch %d, step %5d, loss: %.7f' %
                   (datetime.now(), epoch, i + 1, loss.item()), file=sys.stderr)
 
     train_loss /= len(train_loader)               
@@ -155,7 +155,19 @@ for epoch in range(epoch_start, num_epochs):
     if valid_loss < last_valid_loss:
         last_test_loss = min(valid_loss, last_test_loss)
         # Save checkpoint
-        PATH = f'./checkpoints/mlp_best_model.pt'
+        PATH = os.path.join(args.outdir, 'mlp_best_model.pt')
+        torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': criterion,
+                }, PATH)
+        print(f"Save checkpoint to {PATH}", file=sys.stderr)
+
+
+    if epoch % 100 == 0:
+        # Save checkpoint
+        PATH = os.path.join(args.outdir, f'mlp_model_epoch{epoch}.pt')
         torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
