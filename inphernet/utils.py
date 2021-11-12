@@ -122,7 +122,7 @@ def compute_mrr(z, edge_index, edge_type):
 
 def add_train_args():
     parser = ArgumentParser()
-    parser.add_argument("--gene_mesh_graph", type=str, required=True)
+    parser.add_argument("--gene_mesh_graph", type=str, default=None)
     parser.add_argument("--gene_embed", default=None, type=str, help="gene_embedding file")
     parser.add_argument("--mesh_embed", default=None, type=str, help="mesh_embedding file")
     parser.add_argument("--node2index", default=None, type=str, help="gene or mesh's node index (json) file")

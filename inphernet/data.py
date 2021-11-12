@@ -228,6 +228,8 @@ class GeneMeshMLPDataset(Dataset):
         node1, node2 = [], []
         for i, data in enumerate(edges):
             n1, n2 = data[:2]
+            n1 = str(int(n1))
+            n2 = str(int(n2))
             node1.append(self.idx2gene[n1])
             node2.append(self.idx2mesh[n2])
         n1embed = self.gene_embed.loc[node1].values
@@ -244,5 +246,5 @@ class GeneMeshMLPDataset(Dataset):
         else:
             raise Exception("transform input error")
            
-        return {'embed': torch.from_numpy(embed.astype(np.float32)) , 
+        return {'embed': torch.from_numpy(embed.astype(np.float32)).squeeze(), 
                 'target': torch.from_numpy(y.astype(np.float32))}

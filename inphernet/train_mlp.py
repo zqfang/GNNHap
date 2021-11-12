@@ -64,7 +64,7 @@ valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=10000, num_wor
 print("Build Model", file=sys.stderr)
 model = MLP(input_size)
 model.to(device)
-
+print(model)
 # weight = [class_sample_count[0] / class_sample_count[1]]
 # weight = [430489864/10800307]
 criterion = torch.nn.BCEWithLogitsLoss() #
@@ -73,7 +73,7 @@ optimizer = torch.optim.SGD(model.parameters(),
                             momentum=0.9, weight_decay=0.0005)  
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [200, 500, 800], gamma=0.5)
 
-ckpts = "checkpoints/mlp_best_model.pt"
+ckpts = os.path.join(args.outdir, "mlp_best_model.pt")
 if os.path.exists(ckpts):
     print("Loading checkpoints...", datetime.now(), file=sys.stderr)
     checkpoint = torch.load(ckpts)
@@ -114,8 +114,8 @@ for epoch in range(epoch_start, num_epochs):
         optimizer.step()
         # print statistics
         train_loss += loss.item()
-        if (i) % 500 == 499:    # print every 500 mini-batches
-            print('Current Time = %s, [%d, %5d] loss: %.7f' %
+        #if (i) % 500 == 499:    # print every 500 mini-batches
+        print('Current Time = %s, [%d, %5d] loss: %.7f' %
                   (datetime.now(), epoch, i + 1, loss.item()), file=sys.stderr)
 
     train_loss /= len(train_loader)               
@@ -124,7 +124,7 @@ for epoch in range(epoch_start, num_epochs):
     valid_loss = 0
     acc = 0
     auc = 0
-    aupr = 0
+    apr = 0
     correct = 0
     with torch.no_grad():
         for embeds in valid_loader:
@@ -141,14 +141,15 @@ for epoch in range(epoch_start, num_epochs):
             #precision, recall, pr_threshold = precision_recall_curve(targets, y_pred, pos_label=1)
             auc += roc_auc_score(targets, y_pred)
             acc += accuracy_score(targets > 0, y_pred > 0.5)
-            aupr = average_precision_score(targets, y_pred)
+            apr += average_precision_score(targets, y_pred)
     valid_loss /= len(valid_loader)
     auc /= len(valid_loader)
     acc /= len(valid_loader)
+    apr /= len(valid_loader)
     print('Accuracy of the model on the test set: accuracy %d, AUC: %d %%' % (acc, auc))
     tb.add_scalar('Train/loss', train_loss, epoch) 
     tb.add_scalar('Valid/loss', valid_loss, epoch) 
-    tb.add_scalar('Valid/pr', aupr, epoch) 
+    tb.add_scalar('Valid/pr', apr, epoch) 
     tb.add_scalar('Valid/roc', auc, epoch) 
 
     if valid_loss < last_valid_loss:
