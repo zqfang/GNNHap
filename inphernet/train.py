@@ -1,5 +1,5 @@
 
-import os, sys, glob
+import os, sys, glob, gc
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -66,7 +66,8 @@ model = HeteroGNN(heterodata=gm_data, hidden_channels=256, num_layers=2)
 
 # config
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [200, 500, 800], gamma=0.5)
+# scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [200, 500, 800], gamma=0.5)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=50, T_mult=4, eta_min=1e-4)
 model.to(device)
 
 @torch.no_grad()
@@ -86,6 +87,7 @@ def valid(data: HeteroData, device='cpu'):
 # release memory
 del H
 del gm_data
+gc.collect()
 
 ## Trainining
 best_val_loss = np.Inf
