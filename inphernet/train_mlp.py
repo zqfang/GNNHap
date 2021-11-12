@@ -138,15 +138,13 @@ for epoch in range(epoch_start, num_epochs):
         那么一个epoch内所有batch使用的都是同一个学习率,为了使得不同batch也使用不同的学习率
         则可以在这里进行.step
         '''
+        lr = scheduler.get_lr()[0]
         scheduler.step(epoch + batch / len(train_loader))
       
-        print('%s, epoch %d, step %5d, loss: %.7f' %
-                  (datetime.now(), epoch, batch + 1, loss.item()), file=sys.stderr)
+        print('%s, epoch %d, step %5d, loss %.7f, lr %.7f' %
+                  (datetime.now(), epoch, batch + 1, loss.item(), lr), file=sys.stderr)
 
-    train_loss /= len(train_loader) 
-    # learning rate step
-    # lr = scheduler.get_lr()[0]     
-    scheduler.step()         
+    train_loss /= len(train_loader)       
     # # Test the Model
     model.eval()
     valid_loss = 0
