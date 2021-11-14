@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.data import HeteroData
 from torch_geometric.nn import HeteroConv, GCNConv, SAGEConv, GATConv, Linear
+from torch_geometric.utils import add_remaining_self_loops, remove_self_loops
 
 
 class HeteroGNN(torch.nn.Module):
@@ -46,26 +47,41 @@ class HeteroGNN(torch.nn.Module):
             # SAGEConv((-1, -1), hidden_channels)
             mconv = HeteroConv({edge_type: GCNConv(hidden_channels, hidden_channels, add_self_loops=False)
                                 for edge_type in _edge_types if edge_type[1] not in ['genemesh','rev_genemesh'] 
-                               }, aggr='sum')
+                               }, aggr='mean')
             #mconv = HeteroConv(hetero_tmp, aggr='sum')
             #gconv = HeteroConv({('gene', 'ppi', 'gene'): GCNConv(-1, hidden_channels, add_self_loops=False)}, aggr='mean')
             self.convs.append(mconv)
             #self.gene_convs.append(gconv)
             
         #self.loss_fn = torch.nn.BCEWithLogitsLoss()    
-    def forward(self, x_dict, edge_index_dict):
+    def forward(self, x_dict, edge_index_dict, heterodata: HeteroData=None):
+        # x_dict = heterodata.x_dict
+        # edge_index_dict = heterodata.edge_index_dict
         # linear + relu + bn
         x_dict = {key: self.lin_dict[key](x) for key, x in x_dict.items()} 
-            
+        
+        # mesh_edge_index = []
+        # mesh_edge_type = []
+        # # convert edge_index_dict to homologue graph if you we wanna use RGCN api
+        # for e, edge_type in enumerate(heterodata.edge_types):
+        #     if edge_type[1] not in ['genemesh','rev_genemesh', 'ppi']:
+        #         mesh_edge_index.append(heterodata[edge_type].edge_index)
+        #         t = torch.full(mesh_edge_index[-1].size(1), e, dtype=torch.LongTensor)
+        #         mesh_edge_type.append(t)
+        # mesh_edge_index = torch.hstack(mesh_edge_index)
+        # mesh_edge_index = torch.hstack(mesh_edge_type)
+        # mesh_edge_index = remove_self_loops(mesh_edge_index)  ## FIXME edge_type remov ?        
+        # mesh_edge_index, edge_weight = add_remaining_self_loops(mesh_edge_index, num_nodes=heterodata['mesh'].num_nodes)
+        # convolute ppi and mesh net
+
         # convolute gene mesh net
         for conv in self.gene_mesh_convs:
             x_dict = conv(x_dict, edge_index_dict)
             x_dict = {key: x.relu() for key, x in x_dict.items()}
-      
-        # convolute ppi and mesh net
+
         for mconv in self.convs:
             x_dict = mconv(x_dict, edge_index_dict)
-            x_dict = {key: x.relu() for key, x in x_dict.items()}
+            x_dict = {key: x.relu() for key, x in x_dict.items()}   
 
         # FFN
         x_dict = {key: self.lin_dict2[key](x) for key, x in x_dict.items()} 
@@ -87,21 +103,6 @@ class HeteroGNN(torch.nn.Module):
         return torch.nn.functional.binary_cross_entropy_with_logits(score, target)
 
 
-
-# Model1
-class LogisticRegression(torch.nn.Module):
-    def __init__(self, input_size):
-        super(LogisticRegression, self).__init__()
-        self.linear = torch.nn.Linear(input_size, 1)
-    
-    def forward(self, x):
-        out = self.linear(x)
-        # Batch, C, W, H
-        return out.view(-1)
-    
-
-
-    
 # model 2: multiPercepton
 class MLP(torch.nn.Module):
     def __init__(self, input_size):

@@ -12,6 +12,11 @@ from torch_geometric.data import HeteroData
 from torch_geometric.utils import (negative_sampling, to_undirected, is_undirected,
                                    add_remaining_self_loops, remove_isolated_nodes, remove_self_loops)
 
+import torch_geometric.transforms as T
+from torch_geometric.utils import (negative_sampling, to_undirected, is_undirected,
+                                   add_remaining_self_loops, remove_isolated_nodes, remove_self_loops)
+from typing import Tuple, List, Dict
+
 class GeneMeshData:
     """
     Convert networkX to HeteroData
@@ -25,6 +30,7 @@ class GeneMeshData:
         if not isinstance(H, nx.MultiGraph):
             raise Exception("H must be a networkx.MultiGraph object")
         self.H = H.copy()
+        self._data = None
         self.data = HeteroData()
         
         gene_nodes = None
@@ -50,6 +56,8 @@ class GeneMeshData:
         """
         build HeteroData Object
         """
+        if self._data is not None:
+            return self.data
         # build graph
         self.set_edges()
 
@@ -68,6 +76,8 @@ class GeneMeshData:
         self.data = T.ToUndirected()(self.data)
         #self.data = T.NormalizeFeatures()(self.data)
         self.H = None
+        self._data = 1
+        
         return self.data
     
     def _get_nodes(self, gene_nodes: List[str]=None, mesh_nodes: List[str]=None):
@@ -122,8 +132,14 @@ class GeneMeshData:
                 
             triplets.append((head, relation, tail, weight))
         self.triplets = pd.DataFrame(triplets, columns=['head','relation', 'tail', 'weight'])
+        # to numberic values
         self.edge_types = sorted(self.triplets.relation.unique())
-                                                               
+        self.edgetype2index = {t:i for i, t in enumerate(self.edge_types)}
+        self.triplets['head_idx'] = self.triplets['head'].map(self.node2idx).astype(int)
+        self.triplets['tail_idx'] = self.triplets['tail'].map(self.node2idx).astype(int)
+        self.triplets['edge_type'] = self.triplets['relation'].map(self.edgetype2index).astype(int)
+
+
     def set_nodes(self, node_type='gene', node_features=None):
         """
         node_type: gene, or mesh
@@ -137,8 +153,8 @@ class GeneMeshData:
         nodes = pd.DataFrame(nodes, columns=['node','nodeidx','metanode','node_labels'])
         nodes = nodes.sort_values('nodeidx') # this is very important step
         self.data[node_type].num_nodes = len(nodes)
-        self.data[node_type].node_metatype = nodes.metanode.to_list()
-        self.data[node_type].node_labels = nodes.node_labels.to_list()
+        #self.data[node_type].node_metatype = nodes.metanode.to_list()
+        #self.data[node_type].node_labels = nodes.node_labels.to_list()
         if node_features is None:
             self.data[node_type].x = torch.nn.functional.one_hot(torch.arange(0, len(nodes))).type(torch.float)
         elif isinstance(node_features, pd.DataFrame):
@@ -153,12 +169,10 @@ class GeneMeshData:
         """
         set edge index, convert to PyG compatible convert
         """
-        self.edgetype2index = {t:i for i, t in enumerate(self.edge_types)}
-        edge_type_tmp = torch.from_numpy(self.triplets['relation'].map(self.edgetype2index).values)
+        
+        edge_type_tmp = torch.from_numpy(self.triplets.edge_type.values)
         edge_attr_full = torch.nn.functional.one_hot(edge_type_tmp, num_classes=len(self.edge_types)).type(torch.float)
         
-        self.triplets['head_idx'] = self.triplets['head'].map(self.node2idx)
-        self.triplets['tail_idx'] = self.triplets['tail'].map(self.node2idx)
         for edge_type in self.edge_types:
             mask = self.triplets.relation == edge_type
             triplets = self.triplets[mask]
@@ -189,6 +203,9 @@ class GeneMeshData:
                 edge_index, _ , _ = remove_isolated_nodes(edge_index, num_nodes=len(self.m_nodes))
                 self.data['mesh', edge_type, 'mesh'].edge_index = edge_index
                 #self.data['mesh', edge_type, 'mesh'].edge_attr = edge_attr
+        ## convert to undirected graph if you wanna use triplets
+        # self.data['triplets'] = torch.from_numpy(self.triplets.loc[:,['head_idx','tail_idx','edge_type']].values)
+        # self.data['edgetype2idx'] = self.edgetype2idx
 
 class GeneMeshMLPDataset(Dataset):
     def __init__(self, edge_list, gene_embed, mesh_embed, idx2gene, idx2mesh, transform= "concat"):
