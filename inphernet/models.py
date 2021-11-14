@@ -116,6 +116,9 @@ class MLP(torch.nn.Module):
                                     torch.nn.ReLU(),
                                     torch.nn.Linear(hidden_1, hidden_2),
                                     torch.nn.ReLU(),
+                                    torch.nn.BatchNorm1d(hidden_2),
+                                    torch.nn.ReLU(),
+                                    torch.nn.Linear(hidden_2, hidden_2),
                                     torch.nn.Dropout(0.2),
                                     torch.nn.Linear(hidden_2, 1)) 
     def forward(self,x):
