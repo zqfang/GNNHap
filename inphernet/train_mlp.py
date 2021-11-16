@@ -37,8 +37,8 @@ mesh_features = pd.read_csv(args.mesh_embed, index_col=0)
 gene_features = pd.read_csv(args.gene_embed, index_col=0, header=None)
 gene_features.index = gene_features.index.astype(str)
 
-train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
-valid_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
+train_data = joblib.load(os.path.join(args.outdir,"train.data.20211114.pkl"))
+valid_data = joblib.load(os.path.join(args.outdir,"val.data.20211114.pkl"))
 
 
 train_edge = torch.vstack([train_data['gene','genemesh','mesh'].edge_label_index, 
@@ -191,7 +191,7 @@ for epoch in range(epoch_start, num_epochs):
     tb.add_scalar('Valid/roc', auc, epoch) 
     tb.add_pr_curve("Precision-Recall", y, y_preds, epoch)
 
-    if epoch % 100 == 0:
+    if epoch % 20 == 0:
         # Save checkpoint
         PATH = os.path.join(args.outdir, f'mlp_model_epoch{epoch}.pt')
         torch.save({
