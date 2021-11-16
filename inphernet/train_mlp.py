@@ -50,7 +50,7 @@ perm = torch.randperm(train_edge.shape[0])
 train_edge = train_edge[perm,:]
 
 perm = torch.randperm(valid_edge.shape[0])
-train_edge = valid_edge[perm,:]
+valid_edge = valid_edge[perm,:]
 
 with open(args.node2index, 'r') as j:
     node2index = json.load(j)
@@ -62,7 +62,7 @@ train_data = GeneMeshMLPDataset(train_edge, gene_features, mesh_features, idx2ge
 valid_data = GeneMeshMLPDataset(valid_edge, gene_features, mesh_features, idx2gene, idx2mesh)
 
 train_loader = torch.utils.data.DataLoader(train_data, batch_size=200000, num_workers=6, shuffle=True)
-valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=200000, num_workers=6, shuffle=True)
+valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=200000, num_workers=6)
 
 
 
@@ -185,10 +185,11 @@ for epoch in range(epoch_start, num_epochs):
     acc = accuracy_score(y > 0, y_preds > 0.5)
     apr = average_precision_score(y, y_preds)
     print('Validation: epoch %4d, accuracy %.2f, pr %.2f, auc %.2f ' % (epoch, acc, apr, auc))
-    tb.add_scalar('Train/loss', train_loss, epoch) 
-    tb.add_scalar('Valid/loss', valid_loss, epoch) 
+    tb.add_scalars('Loss', {'train':train_loss,
+                             'valid':valid_loss}, epoch) 
     tb.add_scalar('Valid/pr', apr, epoch) 
     tb.add_scalar('Valid/roc', auc, epoch) 
+    tb.add_pr_curve("Precision-Recall", y, y_preds, epoch)
 
     if epoch % 100 == 0:
         # Save checkpoint
@@ -200,3 +201,7 @@ for epoch in range(epoch_start, num_epochs):
                 'loss': criterion,
                 }, PATH)
         print(f"Save checkpoint to {PATH}", file=sys.stderr)
+
+
+tb.add_graph(model, inputs)
+tb.close()
