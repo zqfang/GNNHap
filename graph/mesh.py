@@ -170,6 +170,7 @@ class SequenceEncoder(object):
 
 
 if __name__ == "__main__":
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     ## Input 
     MESH_XML = "MeSH/desc2021.xml"
     ## Output
@@ -182,7 +183,7 @@ if __name__ == "__main__":
     mg = MeshDAG(mesh_nodes)
     mesh_graph = mg(outfile=OUT_MESH_GRAPH)
     # embeddings
-    mesh_encoder = SequenceEncoder( device='cpu') # model_name='sentence-transformers/allenai-specter'
+    mesh_encoder = SequenceEncoder(device=device) # model_name='sentence-transformers/allenai-specter'
     # print("Max Sequence Length:", model.max_seq_length)
     ##Change the length to 200
     #model.max_seq_length = 200

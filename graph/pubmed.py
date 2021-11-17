@@ -540,9 +540,9 @@ class GeneMeSHGraph(object):
         pn = []
         for g in gene_ners:
             g = g.strip()
-            if g.find(" ") != -1:
+            if g.find(" ") != -1: # protein names
                 pn.append(g.lower()) # make protein names lower 
-            if len(g) > 1: 
+            elif len(g) > 1: # gene names
                 gn.append(g) # need to be exact match
         return gn, pn
     
@@ -585,12 +585,12 @@ class GeneMeSHGraph(object):
                 
             # protein name recognition  
             if 'protein_names' not in node: continue
-            protein_names = np.unique([p.lower() for p in node['protein_names']])                
+            protein_names = np.unique([p.lower() for p in node['protein_names']]) # lowercase the names !                
             for p in protein_names:
                 if p[0].upper() in protein_index:
                     protein_index[p[0].upper()].add(geneid)
-       
         return gene_index, protein_index
+
     def _concat(self,):
         # gene match
         for geneid, node in self.gene_nodes.items():          
@@ -604,6 +604,7 @@ class GeneMeSHGraph(object):
             self.gene_nodes[geneid]['_gene_merge'] = gene_names.tolist()             
             # protein name recognition  
             if 'protein_names' not in node: continue
+            # lower case to for better match
             protein_names = np.unique([p.lower() for p in node['protein_names']])
             if len(protein_names) == 0: continue
             self.gene_nodes[geneid]['_protein_merge'] = protein_names.tolist() 
@@ -621,17 +622,18 @@ class GeneMeSHGraph(object):
         gene_ners, protein_ners = self._split_entities(ners)
         # gene_ners = np.array(list(gene_ners)) # set could not convert to list directly
         gene_ners = np.unique(gene_ners)
-        protein_ners = np.unique(protein_ners) # already lower, just need to make unique 
+        protein_ners = np.unique(protein_ners) # already lowercase, just need to make unique 
         
         # gene match
         # TODO: if gene name or protein name belong to same geneid, it will be counted twice
         # we use set(), it won't be counted twice, we only record pmid. that's it
         for gene in gene_ners:
-            gind = gene[0].upper()
+            gind = gene[0].upper() # select gene names starts with gind
             if gind not in gene_index: continue
             for geneid in gene_index[gind]:
                 node = self.gene_nodes[geneid]
-                if gene in node['_gene_merge']:
+                # To support mouse and human at the same time, convert gene to uppercase
+                if gene in node['_gene_merge'] or gene.upper() in node['_gene_merge']:
                     #breakpoint()
                     self.gene_nodes[geneid]['PMIDs'].add(pmid)
                     
@@ -705,7 +707,6 @@ class GeneMeSHGraph(object):
         # reduce computation time, concat genenames and protein names just once
         self._concat()
         
-
         for pmid, pub in pubmed.items(): 
             # if not research artical type, skip
             pubtype = pub['PublicationType'].values()
@@ -725,11 +726,12 @@ class GeneMeSHGraph(object):
             # _ners = self._spacy_ner(text, nlp)
             doc = self.nlp(text)     
             _ners = set(ent.text for ent in doc.ents if ent.label_ == 'GENE_OR_GENE_PRODUCT')
+            # NOTE: _ners are case sensetive
             # pubtator gene recognition
             #ret = pubtator.submitPMIDList(pmid, concepts="gene", fmt="biocjson")
             ## only 1 pmid each iteration, sometimes will cause http connection fail. use batch query
             #gene_pubtator = pubtator.getGeneMention()[pmid] # only 1 pmid each iteration
-
+        
             # intersect the two
             if pmid in gene_pubtator:
                 _ners = _ners.union(gene_pubtator[pmid])           

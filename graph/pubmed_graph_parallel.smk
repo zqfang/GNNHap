@@ -4,13 +4,16 @@ import networkx as nx
 from pubmed import GeneMeSHGraph, PubMedXMLPaser  
 from tqdm import tqdm
 
+
+wkdir: "/data/bases/fangzq/Pubmed"
+
 INPUT = glob.glob("2019/*xml.gz")
 OUTPUT = [xml.replace("xml.gz", "pkl") for xml in INPUT]
 GRAPHS = [xml.replace("xml.gz", "human.graph.pkl") for xml in INPUT]
 PUBS = [xml.split("/")[-1].replace(".xml.gz", "") for xml in INPUT]
 PUBTATOR = expand("2019/pubtator/{splits}.pubtator.pkl", splits=PUBS)
 PUBMETA = expand("2019/{splits}.meta.pkl", splits=PUBS)
-WHOLE_GRAPH = "human_gene_mesh_networkx.pkl"
+WHOLE_GRAPH = "human_gene_mesh_networkx_20211118.pkl"
 
 
 ###### rules ###############
@@ -77,7 +80,7 @@ rule graph_build_edge:
     input: "human.gene_mesh_noedge.pkl"
     output: 
         "human_gene_mesh_dict.pkl",
-        "human_gene_mesh_networkx.pkl",
+        WHOLE_GRAPH,
     run:
         G0 = joblib.load(input[0])
         G0.edge_add() # take a few hours to run
