@@ -28,86 +28,93 @@ from jax_unirep import get_reps
 from pubmed import UniProtXMLParser
 from gseapy.parser import Biomart
 
-### Input 
-AA_SEQ = "GRCh38_latest_protein.faa"
-GENE_INFO = "Homo_sapiens.gene_info.gz"
+def build_gene_nodes(GENE_INFO):
+    ## Start
+    # way to get gene alias
+    genes = pd.read_table(GENE_INFO)
+    # we only interested in protein-coding genes
+    protein_coding = genes[genes.type_of_gene == "protein-coding"]
+    gene_id = protein_coding.GeneID.astype(str).to_list()
+    gene_alias = protein_coding.Synonyms.str.split("|").to_list()
 
-### Output
-OUT_AA_EMBED = "human_gene_unirep.embeb.csv"
-OUT_GENE_NODES = "human_gene_nodes.pkl"
+    gene_nodes = {}
+    for g, alias, symbol in zip(gene_id, gene_alias, protein_coding.Symbol.to_list()):
+        gene_nodes[g] = {'gene_symbol': symbol, 'gene_synonyms': alias }
 
-## Start
-# way to get gene alias
-genes = pd.read_table(GENE_INFO)
-# we only interested in protein-coding genes
-protein_coding = genes[genes.type_of_gene == "protein-coding"]
+    ## get mapping and alias ...
+    uxp = UniProtXMLParser()
+    geneid2uniprot = uxp.mapping(fr='P_ENTREZGENEID', to='ID', query=gene_id)
 
-gene_id = protein_coding.GeneID.astype(str).to_list()
-gene_alias = protein_coding.Synonyms.str.split("|").to_list()
+    # take a long time to run, paralle processing better
+    for geneid, uniprot_ids in geneid2uniprot.items():
+        meta = uxp.searchall(uniprot_ids)
+        #del meta['query_accession']
+        protein_names = []
+        gene_names = []
+        accessions = []
+        uids = []
+        organism = []
+        for uid, udata in meta.items():
+            protein_names += udata['protein_names']
+            gene_names += udata['gene_names']
+            accessions += udata['accession']
+            organism.append(udata['organism'])
+            uids.append(uid)
+        gene_nodes[geneid]['protein_names'] = list(set(protein_names))
+        gene_nodes[geneid]['gene_names'] = list(set(gene_names))
+        gene_nodes[geneid]['uniprot_accession'] = list(set(accessions))
+        gene_nodes[geneid]['uniprot_id'] = list(set(uids))
+        gene_nodes[geneid]['organism'] = list(set(organism))  
 
-gene_nodes = {}
-for g, alias, symbol in zip(gene_id, gene_alias, protein_coding.Symbol.to_list()):
-    gene_nodes[g] = {'gene_symbol': symbol, 'gene_synonyms': alias }
+    for gid, data in gene_nodes.items():
+        if '-' in data['gene_synonyms']:
+            data['gene_synonyms'].pop(data['gene_synonyms'].index("-"))
 
-## get mapping and alias ...
-uxp = UniProtXMLParser()
-geneid2uniprot = uxp.mapping(fr='P_ENTREZGENEID', to='ID', query=gene_id)
+    # Save gene nodes information
+    return gene_nodes, protein_coding
 
-# take a long time to run, paralle processing better
-for geneid, uniprot_ids in geneid2uniprot.items():
-    meta = uxp.searchall(uniprot_ids)
-    #del meta['query_accession']
-    protein_names = []
-    gene_names = []
-    accessions = []
-    uids = []
-    organism = []
-    for uid, udata in meta.items():
-        protein_names += udata['protein_names']
-        gene_names += udata['gene_names']
-        accessions += udata['accession']
-        organism.append(udata['organism'])
-        uids.append(uid)
-    gene_nodes[geneid]['protein_names'] = list(set(protein_names))
-    gene_nodes[geneid]['gene_names'] = list(set(gene_names))
-    gene_nodes[geneid]['uniprot_accession'] = list(set(accessions))
-    gene_nodes[geneid]['uniprot_id'] = list(set(uids))
-    gene_nodes[geneid]['organism'] = list(set(organism))  
+def filter_aa_seq(AA_SEQ, protein_coding):
+    ## Map refseq protein ids
+    bm = Biomart()
+    attrs = bm.get_attributes(dataset='hsapiens_gene_ensembl') 
+    filters = bm.get_filters(dataset='hsapiens_gene_ensembl')
 
-for gid, data in gene_nodes.items():
-    if '-' in data['gene_synonyms']:
-        data['gene_synonyms'].pop(data['gene_synonyms'].index("-"))
+    queries = protein_coding.GeneID.astype(str).to_list()
+    results = bm.query(dataset='hsapiens_gene_ensembl', 
+                        attributes=['entrezgene_id', 'refseq_peptide'],
+                        filters={'entrezgene_id': queries}
+                        )         
 
-# Save gene nodes information
-joblib.dump(gene_nodes, filename="human_gene_nodes.pkl")
+    results.dropna()['entrezgene_id'].nunique()
 
-## Map refseq protein ids
-bm = Biomart()
-attrs = bm.get_attributes(dataset='hsapiens_gene_ensembl') 
-filters = bm.get_filters(dataset='hsapiens_gene_ensembl')
+    ## read AA sequences
+    prot_df = []
+    for seq_record in SeqIO.parse(AA_SEQ, "fasta"):
+        prot_df.append((seq_record.id, str(seq_record.seq)))
+    prot_df = pd.DataFrame(prot_df, columns=['prot_id','peptide'])
+    results = results.drop_duplicates().dropna()
+    prot_df.index = prot_df.prot_id.str.split(".").str[0]
+    res = results.merge(prot_df, left_on='refseq_peptide', right_index=True, how='left')
+    res = res.dropna()
 
-queries = protein_coding.GeneID.astype(str).to_list()
-results = bm.query(dataset='hsapiens_gene_ensembl', 
-                    attributes=['entrezgene_id', 'refseq_peptide'],
-                    filters={'entrezgene_id': queries}
-                    )         
+    # only select AA with max sequence length
+    AA = res.groupby(['entrezgene_id'])['peptide'].agg(lambda x: x.loc[x.str.len().idxmax()])
+    return AA
 
-results.dropna()['entrezgene_id'].nunique()
 
-## read AA sequences
-prot_df = []
-for seq_record in SeqIO.parse(AA_SEQ, "fasta"):
-    prot_df.append((seq_record.id, str(seq_record.seq)))
-prot_df = pd.DataFrame(prot_df, columns=['prot_id','peptide'])
-results = results.drop_duplicates().dropna()
-prot_df.index = prot_df.prot_id.str.split(".").str[0]
-res = results.merge(prot_df, left_on='refseq_peptide', right_index=True, how='left')
-res = res.dropna()
+if __name__ == "__main__":
+    ### Input 
+    AA_SEQ = sys.argv[1] # "GRCh38_latest_protein.faa"
+    GENE_INFO = sys.argv[2] #"Homo_sapiens.gene_info.gz"
 
-# only select AA with max sequence length
-AA = res.groupby(['entrezgene_id'])['peptide'].agg(lambda x: x.loc[x.str.len().idxmax()])
+    ### Output
+    OUT_AA_EMBED = sys.argv[3] #"human_gene_unirep.embeb.csv"
+    OUT_GENE_NODES = sys.argv[4] #"human_gene_nodes.pkl"
 
-## get AA embedding
-h_avg, h_final, c_final= get_reps(AA.to_list(), mlstm_size=1900)
-prot_embed = pd.DataFrame(h_avg, index=AA.index)
-prot_embed.to_csv(OUT_AA_EMBED) # row index is entrez id
+    gene_nodes, protein_coding = build_gene_nodes(GENE_INFO)
+    joblib.dump(gene_nodes, filename=OUT_GENE_NODES)
+    AA = filter_aa_seq(AA_SEQ, protein_coding)
+    ## get AA embedding
+    h_avg, h_final, c_final= get_reps(AA.to_list(), mlstm_size=1900)
+    prot_embed = pd.DataFrame(h_avg, index=AA.index)
+    prot_embed.to_csv(OUT_AA_EMBED, header=False) # row index is entrez id

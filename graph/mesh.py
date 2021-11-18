@@ -172,14 +172,16 @@ class SequenceEncoder(object):
 if __name__ == "__main__":
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     ## Input 
-    MESH_XML = "MeSH/desc2021.xml"
+    MESH_XML = sys.argv[1] # "MeSH/desc2021.xml"
     ## Output
-    OUT_MESH_GRAPH = "mesh_graph.csv"
-    OUT_MESH_EMBED = "mesh.sentencetransformer.embed.csv"
+    OUT_MESH_NODES = sys.argv[2] # "mesh_nodes.pkl"
+    OUT_MESH_GRAPH = sys.argv[3] #" mesh_edges.csv"
+    OUT_MESH_EMBED = sys.argv[4] # "mesh.sentencetransformer.embed.csv"
 
     # get started
     mesh = MeSHXMLParser(MESH_XML)
     mesh_nodes = mesh.parse()
+    joblib.dump(mesh_nodes, filename= OUT_MESH_NODES)
     mg = MeshDAG(mesh_nodes)
     mesh_graph = mg(outfile=OUT_MESH_GRAPH)
     # embeddings

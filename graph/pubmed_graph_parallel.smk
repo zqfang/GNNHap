@@ -19,8 +19,27 @@ WHOLE_GRAPH = "human_gene_mesh_networkx_20211118.pkl"
 ###### rules ###############
 rule target:
     input: WHOLE_GRAPH
-    
-    
+
+
+# rule mesh_nodes:
+#     input: "MeSH/desc2021.xml"
+#     output: 
+#         "mesh_nodes.pkl", # metadata
+#         "mesh_edges.csv", # edgelists
+#         "mesh.sentencetransformer.embed.csv" # embedding
+#     shell:
+#         "python mesh.py {input} {output}"
+
+# rule gene_nodes:
+#     input: 
+#         "GRCh38_latest_protein.faa",
+#         "Homo_sapiens.gene_info.gz"
+#     output: 
+#         "human_gene_unirep.embeb.csv", # embedding
+#         "human_gene_nodes.pkl"
+#     shell:
+#         "python gene.py {input} {output}"
+
 # rule pubmed_parser:
 #     input: "2019/{splits}.xml.gz"
 #     output: "2019/{splits}.meta.pkl"
@@ -46,8 +65,8 @@ rule graph_build:
     input: 
         pub="2019/{splits}.meta.pkl",
         pubtator = "2019/pubtator/{splits}.pubtator.pkl",
-        mesh="mesh_nodes.pkl",
-        gene="human_gene_nodes.pkl"
+        mesh="mesh_nodes.pkl", # mesh.py output
+        gene="human_gene_nodes.pkl" # gene.py output
     output:
         "2019/{splits}.human.graph.pkl"
     run:
