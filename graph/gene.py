@@ -109,12 +109,14 @@ if __name__ == "__main__":
 
     ### Output
     OUT_AA_EMBED = sys.argv[3] #"human_gene_unirep.embeb.csv"
-    OUT_GENE_NODES = sys.argv[4] #"human_gene_nodes.pkl"
+    OUT_AA_SEQ = sys.argv[4] #human_gene_aa.csv
+    OUT_GENE_NODES = sys.argv[5] #"human_gene_nodes.pkl"
 
     gene_nodes, protein_coding = build_gene_nodes(GENE_INFO)
-    joblib.dump(gene_nodes, filename=OUT_GENE_NODES)
     AA = filter_aa_seq(AA_SEQ, protein_coding)
     ## get AA embedding
     h_avg, h_final, c_final= get_reps(AA.to_list(), mlstm_size=1900)
     prot_embed = pd.DataFrame(h_avg, index=AA.index)
     prot_embed.to_csv(OUT_AA_EMBED, header=False) # row index is entrez id
+    AA.to_csv(OUT_AA_SEQ, header=False)
+    joblib.dump(gene_nodes, filename=OUT_GENE_NODES)

@@ -1,5 +1,6 @@
-
-
+'''
+The LinkPredictor (MLP) for GeneMesh HeteroGraph training
+'''
 
 import os, sys, json
 import numpy as np
@@ -49,17 +50,17 @@ valid_edge = torch.vstack([valid_data['gene','genemesh','mesh'].edge_label_index
 perm = torch.randperm(train_edge.shape[0])
 train_edge = train_edge[perm,:]
 
+## No need to permute validation data, but it's fine
 perm = torch.randperm(valid_edge.shape[0])
 valid_edge = valid_edge[perm,:]
 
-with open(args.node2index, 'r') as j:
-    node2index = json.load(j)
-idx2gene = {str(i): v for v, i in node2index['gene2index'].items() }
-idx2mesh = {str(i): v for v, i in node2index['mesh2index'].items() }
+# with open(args.node2index, 'r') as j:
+#     node2index = json.load(j)
+# idx2gene = {str(i): v for v, i in node2index['gene2index'].items() }
+# idx2mesh = {str(i): v for v, i in node2index['mesh2index'].items() }
 
-
-train_data = GeneMeshMLPDataset(train_edge, gene_features, mesh_features, idx2gene, idx2mesh)
-valid_data = GeneMeshMLPDataset(valid_edge, gene_features, mesh_features, idx2gene, idx2mesh)
+train_data = GeneMeshMLPDataset(train_edge, gene_features, mesh_features, train_data['nid2gene'], train_data['nid2mesh'])
+valid_data = GeneMeshMLPDataset(valid_edge, gene_features, mesh_features, valid_data['nid2gene'], valid_data['nid2mesh'])
 
 train_loader = torch.utils.data.DataLoader(train_data, batch_size=200000, num_workers=6, shuffle=True)
 valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=200000, num_workers=6)

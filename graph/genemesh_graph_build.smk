@@ -13,53 +13,52 @@ GRAPHS = [xml.replace("xml.gz", "human.graph.pkl") for xml in INPUT]
 PUBS = [xml.split("/")[-1].replace(".xml.gz", "") for xml in INPUT]
 PUBTATOR = expand("2019/pubtator/{splits}.pubtator.pkl", splits=PUBS)
 PUBMETA = expand("2019/{splits}.meta.pkl", splits=PUBS)
-WHOLE_GRAPH = "human_gene_mesh_networkx_20211118.pkl"
-
+HETERO_GRAPH = "human_gene_mesh_hetero_nx.gpkl"
 
 ###### rules ###############
 rule target:
-    input: WHOLE_GRAPH
+    input: HETERO_GRAPH
 
 
-# rule mesh_nodes:
-#     input: "MeSH/desc2021.xml"
-#     output: 
-#         "mesh_nodes.pkl", # metadata
-#         "mesh_edges.csv", # edgelists
-#         "mesh.sentencetransformer.embed.csv" # embedding
-#     shell:
-#         "python mesh.py {input} {output}"
+rule mesh_nodes:
+    input: "MeSH/desc2021.xml"
+    output: 
+        "mesh_nodes.pkl", # metadata
+        "mesh.sentencetransformer.embed.csv" # embedding
+    shell:
+        "python mesh.py {input} {output}"
 
-# rule gene_nodes:
-#     input: 
-#         "GRCh38_latest_protein.faa",
-#         "Homo_sapiens.gene_info.gz"
-#     output: 
-#         "human_gene_unirep.embeb.csv", # embedding
-#         "human_gene_nodes.pkl"
-#     shell:
-#         "python gene.py {input} {output}"
+rule gene_nodes:
+    input: 
+        "GRCh38_latest_protein.faa",
+        "Homo_sapiens.gene_info.gz"
+    output: 
+        "human_gene_unirep.embeb.csv", # embedding
+        "human_gene_aa.csv",
+        "human_gene_nodes.pkl"
+    shell:
+        "python gene.py {input} {output}"
 
-# rule pubmed_parser:
-#     input: "2019/{splits}.xml.gz"
-#     output: "2019/{splits}.meta.pkl"
-#     run:
-#         pubmed = PubMedXMLPaser(input[0])
-#         meta = pubmed.parse()
-#         joblib.dump(meta, output[0])
+rule pubmed_parser:
+    input: "2019/{splits}.xml.gz"
+    output: "2019/{splits}.meta.pkl"
+    run:
+        pubmed = PubMedXMLPaser(input[0])
+        meta = pubmed.parse()
+        joblib.dump(meta, output[0])
     
-#     #shell:
-#     #    "python pubmed_xml_parse.py {input} {output}"
+    #shell:
+    #    "python pubmed_xml_parse.py {input} {output}"
 
-# rule pubtator:
-#     input: 
-#         pub = "2019/{splits}.meta.pkl",
-#     output:
-#         "2019/pubtator/{splits}.pubtator.pkl"
-#     run:
-#         pubmed_meta = joblib.load(input.pub)
-#         gene_pubtator = GeneMeSHGraph.batch_pubtator(pubmed_meta)
-#         joblib.dump(gene_pubtator, filename=output[0])
+rule pubtator:
+    input: 
+        pub = "2019/{splits}.meta.pkl",
+    output:
+        "2019/pubtator/{splits}.pubtator.pkl"
+    run:
+        pubmed_meta = joblib.load(input.pub)
+        gene_pubtator = GeneMeSHGraph.batch_pubtator(pubmed_meta)
+        joblib.dump(gene_pubtator, filename=output[0])
         
 rule graph_build:
     input: 
@@ -107,4 +106,14 @@ rule graph_build_edge:
         G = G0.to_networkx()
         nx.write_gpickle(G, path=output[1])
 
-        
+
+rule hetero_graph_build:
+    input: 
+        "human_gene_mesh_dict.pkl", 
+        "BIOGRID-ALL-4.3.195.tab2.txt"
+    output:
+        "human_ppi_undirected_edgelist.txt",
+        "mesh_edgelist.txt",
+        "human_gene_mesh_hetero_nx.gpkl"
+    shell:
+        "python heterograph.py {input} {output}"
