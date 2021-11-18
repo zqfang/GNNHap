@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 from torch_geometric.data import HeteroData
-from torch_geometric.nn import HeteroConv, GCNConv, SAGEConv, GATConv, Linear
+from torch_geometric.nn import HeteroConv, GCNConv, GATConv
 from torch_geometric.utils import add_remaining_self_loops, remove_self_loops
 
 
@@ -15,7 +15,6 @@ class HeteroGNN(torch.nn.Module):
         self.node_types = heterodata.node_types
         # dense layer
         self.lin_dict = torch.nn.ModuleDict()
-        self.lin_dict2 = torch.nn.ModuleDict()
         for node_type in self.node_types:
             if node_type == "mesh": 
                 in_channel = 768
@@ -24,10 +23,10 @@ class HeteroGNN(torch.nn.Module):
             self.lin_dict[node_type] = torch.nn.Sequential(torch.nn.Linear(in_channel,hidden_channels),    
                                         torch.nn.BatchNorm1d(hidden_channels),
                                         torch.nn.ReLU(),)
-            self.lin_dict2[node_type] = torch.nn.Sequential(torch.nn.Linear(hidden_channels, hidden_channels),    
-                                        torch.nn.BatchNorm1d(hidden_channels),
-                                        torch.nn.ReLU(),
-                                        torch.nn.Linear(hidden_channels, hidden_channels))
+            # self.lin_dict2[node_type] = torch.nn.Sequential(torch.nn.Linear(hidden_channels, hidden_channels),    
+            #                             torch.nn.BatchNorm1d(hidden_channels),
+            #                             torch.nn.ReLU(),
+            #                             torch.nn.Linear(hidden_channels, hidden_channels))
 
         ## gene conv and mesh conv
         self.convs = torch.nn.ModuleList()
@@ -52,11 +51,20 @@ class HeteroGNN(torch.nn.Module):
                 GATConv((hidden_channels, hidden_channels), hidden_channels, add_self_loops=False),
             }, aggr='mean')
             self.gene_mesh_convs.append(conv)
-            
+
+        self.link_predictor = torch.nn.Sequential(torch.nn.Linear(hidden_channels*2, hidden_channels*2),    
+                                        torch.nn.BatchNorm1d(hidden_channels*2),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(hidden_channels*2, hidden_channels),
+                                        torch.nn.BatchNorm1d(hidden_channels, hidden_channels),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(hidden_channels, 1))            
         #self.loss_fn = torch.nn.BCEWithLogitsLoss()    
-    def forward(self, x_dict, edge_index_dict, heterodata: HeteroData=None):
-        # x_dict = heterodata.x_dict
-        # edge_index_dict = heterodata.edge_index_dict
+    def forward(self, x_dict, edge_index_dict, edge_label_index_dict):
+        """
+        edge_label_index_dict: supervision edge_index
+        """
+        # Encoder 
         # linear + relu + bn
         x_dict = {key: self.lin_dict[key](x) for key, x in x_dict.items()} 
         
@@ -70,17 +78,17 @@ class HeteroGNN(torch.nn.Module):
             x_dict = {key: x.relu() for key, x in x_dict.items()}   
 
         # FFN
-        x_dict = {key: self.lin_dict2[key](x) for key, x in x_dict.items()} 
-        
+        # x_dict = {key: self.lin_dict2[key](x) for key, x in x_dict.items()} 
+        # Decoder
+        # out = self.decoder(x_dict, edge_label_index_dict)   
         return x_dict
 
-    
     def distmult(self, x_dict, edge_label_index_dict):
         s = x_dict['gene'][edge_label_index_dict[('gene','genemesh','mesh')][0]]
         t = x_dict['mesh'][edge_label_index_dict[('gene','genemesh','mesh')][1]]
         score = torch.sum(s * t, dim=1)
         return score
-    
+
     def score_loss(self,  x_dict, edge_label_index_dict, edge_label_dict):
         score = self.distmult(x_dict, edge_label_index_dict)
         target = edge_label_dict[('gene','genemesh','mesh')]
@@ -88,6 +96,9 @@ class HeteroGNN(torch.nn.Module):
         #loss = self.loss_fn(score, target))
         return torch.nn.functional.binary_cross_entropy_with_logits(score, target)
 
+
+
+    
 
 # model 2: multiPercepton
 class MLP(torch.nn.Module):

@@ -176,7 +176,7 @@ class GeneMeshData:
         for edge_type in self.edge_types:
             mask = self.triplets.relation == edge_type
             triplets = self.triplets[mask]
-            edge_index = torch.tensor([triplets['head_idx'].astype(int).to_list(), 
+            edge_index = torch.tensor([triplets['head_idx'].astype(int).to_list(),  # so, edge_index -> [gene, mesh]
                                        triplets['tail_idx'].astype(int).to_list()])
             
             weight = torch.from_numpy(triplets['weight'].values.reshape(-1,1).astype(np.float32))

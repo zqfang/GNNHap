@@ -21,7 +21,7 @@ args = add_train_args()
 torch.manual_seed(seed=123456)
 
 os.makedirs(args.outdir, exist_ok=True)
-tb = SummaryWriter(log_dir = args.outdir)
+tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".MLP", comment="basic_model")
 
 
 # Parameters
@@ -187,6 +187,7 @@ for epoch in range(epoch_start, num_epochs):
     print('Validation: epoch %4d, accuracy %.2f, pr %.2f, auc %.2f ' % (epoch, acc, apr, auc))
     tb.add_scalars('Loss', {'train':train_loss,
                              'valid':valid_loss}, epoch) 
+    tb.add_scalar('LearningRate', lr, epoch) 
     tb.add_scalar('Valid/pr', apr, epoch) 
     tb.add_scalar('Valid/roc', auc, epoch) 
     tb.add_pr_curve("Precision-Recall", y, y_preds, epoch)
