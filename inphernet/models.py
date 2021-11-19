@@ -14,19 +14,17 @@ class HeteroGNN(torch.nn.Module):
         _edge_types = heterodata.edge_types
         self.node_types = heterodata.node_types
         # dense layer
-        self.lin_dict = torch.nn.ModuleDict()
+        self.embed = torch.nn.ModuleDict()
+        self.lin = torch.nn.ModuleDict()
         for node_type in self.node_types:
             if node_type == "mesh": 
                 in_channel = 768
             elif node_type == "gene":
                 in_channel = 1900
-            self.lin_dict[node_type] = torch.nn.Sequential(torch.nn.Linear(in_channel,hidden_channels),    
+            self.embed[node_type] = torch.nn.Sequential(torch.nn.Linear(in_channel,hidden_channels),    
                                         torch.nn.BatchNorm1d(hidden_channels),
                                         torch.nn.ReLU(),)
-            # self.lin_dict2[node_type] = torch.nn.Sequential(torch.nn.Linear(hidden_channels, hidden_channels),    
-            #                             torch.nn.BatchNorm1d(hidden_channels),
-            #                             torch.nn.ReLU(),
-            #                             torch.nn.Linear(hidden_channels, hidden_channels))
+            self.lin[node_type] = torch.nn.Linear(hidden_channels, hidden_channels)
 
         ## gene conv and mesh conv
         self.convs = torch.nn.ModuleList()
@@ -60,13 +58,13 @@ class HeteroGNN(torch.nn.Module):
                                         torch.nn.ReLU(),
                                         torch.nn.Linear(hidden_channels, 1))            
         #self.loss_fn = torch.nn.BCEWithLogitsLoss()    
-    def forward(self, x_dict, edge_index_dict, edge_label_index_dict):
+    def forward(self, x_dict, edge_index_dict):
         """
         edge_label_index_dict: supervision edge_index
         """
         # Encoder 
         # linear + relu + bn
-        x_dict = {key: self.lin_dict[key](x) for key, x in x_dict.items()} 
+        x_dict = {key: self.embed[key](x) for key, x in x_dict.items()} 
         
         # convolute gene mesh net
         for conv in self.gene_mesh_convs:
@@ -76,11 +74,10 @@ class HeteroGNN(torch.nn.Module):
         for mconv in self.convs:
             x_dict = mconv(x_dict, edge_index_dict)
             x_dict = {key: x.relu() for key, x in x_dict.items()}   
-
+  
         # FFN
-        # x_dict = {key: self.lin_dict2[key](x) for key, x in x_dict.items()} 
-        # Decoder
-        # out = self.decoder(x_dict, edge_label_index_dict)   
+        x_dict = {key: self.lin[key](x) for key, x in x_dict.items()} 
+        # Decoder 
         return x_dict
 
     def distmult(self, x_dict, edge_label_index_dict):

@@ -18,6 +18,7 @@ from data import GeneMeshData
 from models import HeteroGNN
 from utils import add_train_args
 from datetime import datetime
+from tqdm.auto import tqdm
 
 # device
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -27,7 +28,8 @@ torch.manual_seed(seed=123456)
 
 os.makedirs(args.outdir, exist_ok=True)
 tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".human_genemesh_gnn")
-# read data in
+# # read data in
+print("Load Gene Mesh Graph")
 H = nx.read_gpickle(args.gene_mesh_graph) # note: H is undirected multigraph
 
 # Load mesh embeddings
@@ -36,31 +38,32 @@ mesh_features = pd.read_csv(args.mesh_embed, index_col=0, header=None)
 gene_features = pd.read_csv(args.gene_embed, index_col=0, header=None)
 gene_features.index = gene_features.index.astype(str)
 
-# # print("Build GraphData")
-# # # build data
-# gm = GeneMeshData(H, gene_features, mesh_features)
-# # # align 
-# gm_data = gm()
-# # save data for future use
-# joblib.dump(gm_data, filename=os.path.join(args.outdir,"genemesh.data.pkl"))
-# # # train test split
-# train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
-#                                          add_negative_train_samples=True, 
-#                                          neg_sampling_ratio=1.0,
-#                                          edge_types=('gene','genemesh','mesh'), # must be tuple, not list
-#                                          rev_edge_types=('mesh','rev_genemesh','gene'))(gm_data)
-# print("Save graph data")
-# joblib.dump(train_data, filename=os.path.join(args.outdir,"train.data.pkl"))
-# joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
-# joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
+# print("Build GraphData")
+# # build data
+gm = GeneMeshData(H, gene_features, mesh_features)
+# # align 
+gm_data = gm()
+# save data for future use
+joblib.dump(gm_data, filename=os.path.join(args.outdir,"genemesh.data.pkl"))
+# # train test split
+train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
+                                         add_negative_train_samples=True, 
+                                         neg_sampling_ratio=1.0,
+                                         edge_types=('gene','genemesh','mesh'), # must be tuple, not list
+                                         rev_edge_types=('mesh','rev_genemesh','gene'))(gm_data)
+print("Save graph data")
+joblib.dump(train_data, filename=os.path.join(args.outdir,"train.data.pkl"))
+joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
+joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
 
 print("Read graph data")
-train_data = joblib.load("checkpoints/train.data.20211114.pkl")
-val_data = joblib.load("checkpoints/val.data.20211114.pkl")
-test_datat = joblib.load("checkpoints/test.data.20211114.pkl")
+# train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
+# val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
+# test_datat = joblib.load(os.path.join(args.outdir,"test.data.pkl"))
 ## init model
 model = HeteroGNN(heterodata=train_data, hidden_channels=512, num_layers=2)
-
+print("Model")
+print(model)
 # config
 criterion = torch.nn.BCEWithLogitsLoss() #
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=1e-4)
@@ -76,7 +79,7 @@ def train(train_data: HeteroData, epoch):
     # minibatch training for supervision links
     data_loader = DataLoader(torch.arange(edge_label.size(0)), batch_size=batch_size, shuffle=True)
     train_loss = 0
-    for i, perm in enumerate(data_loader):
+    for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Train', position=0)):
         optimizer.zero_grad()
         h_dict = model(train_data.x_dict, train_data.edge_index_dict)
         g = h_dict['gene'][edge_label_index[0, perm]]
@@ -111,7 +114,7 @@ def valid(data: HeteroData, device='cpu'):
     h_dict = model(data.x_dict, data.edge_index_dict) # only need compute once for node_representations
     # minibatch testing for supervision links
     data_loader = DataLoader(torch.arange(edge_label.size(0)), batch_size=batch_size)
-    for i, perm in enumerate(data_loader):
+    for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Valid')):
         g = h_dict['gene'][edge_label_index[0, perm]] 
         m = h_dict['mesh'][edge_label_index[1, perm]]
         targets = edge_label[perm]
@@ -122,8 +125,7 @@ def valid(data: HeteroData, device='cpu'):
         #loss.backward()
         val_loss += loss.item()
         y.append(targets)
-        y_preds.append(preds)
-        print(f'{datetime.now()}  Epoch: {epoch:03d}, Step: {i}, Valid Loss: {loss.item():.7f}, Learning rate: {lr:.7f}')  
+        y_preds.append(preds) 
     val_loss /= len(data_loader)
     y_preds = torch.cat(y_preds, dim=0) # note the difference with torch.stack()
     y = torch.cat(y, dim=0).type(torch.LongTensor)

@@ -75,7 +75,7 @@ class GeneMeshData:
         #  works like in the homogenous case, and normalizes all specified features (of all types) to sum up to one.
         # self.data = T.ToUndirected(merge=False)(self.data)
         # self.data = T.NormalizeFeatures()(self.data)
-        self.data['edgetype2idx']
+        self.data['edgetype2idx'] = self.edgetype2index
         self.data['nid2gene'] = self.idx2gene
         self.data['nid2mesh'] = self.idx2mesh
         self.H = None
