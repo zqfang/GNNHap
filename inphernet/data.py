@@ -214,7 +214,7 @@ class GeneMeshData:
                 # 
                 edge_index, _ = remove_self_loops(edge_index)
                 # FIXME: add self_loops for multi-relational graph as MESH ?
-                edge_index, edge_weight  = add_remaining_self_loops(edge_index, num_nodes=len(self.m_nodes))
+                # edge_index, edge_weight  = add_remaining_self_loops(edge_index, num_nodes=len(self.m_nodes))
                 # FIXME: remove isolated nodes ?
                 # edge_index, _ , _ = remove_isolated_nodes(edge_index, num_nodes=len(self.m_nodes))
                 self.data['mesh', edge_type, 'mesh'].edge_index = edge_index

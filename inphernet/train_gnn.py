@@ -41,16 +41,20 @@ gene_features.index = gene_features.index.astype(str)
 gm = GeneMeshData(H, gene_features, mesh_features)
 # # align 
 gm_data = gm()
+# save data for future use
+joblib.dump(gm_data, filename=os.path.join(args.outdir,"genemesh.data.pkl"))
 # # train test split
 train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
                                          add_negative_train_samples=True, 
                                          neg_sampling_ratio=1.0,
                                          edge_types=('gene','genemesh','mesh'), # must be tuple, not list
                                          rev_edge_types=('mesh','rev_genemesh','gene'))(gm_data)
-print("Read graph data")
+print("Save graph data")
 joblib.dump(train_data, filename=os.path.join(args.outdir,"train.data.pkl"))
 joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
 joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
+
+#print("Read graph data")
 # train_data = joblib.load("checkpoints/train.data.20211114.pkl")
 # val_data = joblib.load("checkpoints/val.data.20211114.pkl")
 # test_datat = joblib.load("checkpoints/test.data.20211114.pkl")

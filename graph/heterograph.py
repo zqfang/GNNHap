@@ -232,7 +232,6 @@ if __name__ == "__main__":
         head = str(head)
         tail = str(tail)
         H.add_edge(head, tail,  edge_type='ppi')
-    breakpoint()
     print("Build MESH DAG")
     meshdag = MeshDAG(graph.mesh_nodes)
     mesh_graph = meshdag(outfile=OUT_MESH_GRAPH) # return a dataframe
