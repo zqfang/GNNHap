@@ -27,17 +27,21 @@ class HeteroGNN(torch.nn.Module):
             self.lin[node_type] = torch.nn.Linear(hidden_channels, hidden_channels)
 
         ## gene conv and mesh conv
-        self.convs = torch.nn.ModuleList()
-        for _ in range(num_layers):
-            # NOTE: lazy initization require define new layers every time
-            # SAGEConv((-1, -1), hidden_channels)
+        self.gconvs = torch.nn.ModuleList()
+        self.mconvs = torch.nn.ModuleList()
+        # self.convs = torch.nn.ModuleList()
+        for _ in range(num_layers):            
             mconv = HeteroConv({edge_type: GCNConv(hidden_channels, hidden_channels, add_self_loops=False)
-                                for edge_type in _edge_types if edge_type[1] not in ['genemesh','rev_genemesh'] 
+                                for edge_type in _edge_types if edge_type[1] not in ['genemesh','rev_genemesh', 'ppi'] 
                                }, aggr='mean')
-            #mconv = HeteroConv(hetero_tmp, aggr='sum')
-            #gconv = HeteroConv({('gene', 'ppi', 'gene'): GCNConv(-1, hidden_channels, add_self_loops=False)}, aggr='mean')
-            self.convs.append(mconv)
-            #self.gene_convs.append(gconv)
+            gconv = GCNConv(hidden_channels, hidden_channels, add_self_loops=False) # self_loop already added
+            self.gconvs.append(gconv)
+            self.mconvs.append(mconv)
+            ## more simple api
+            # conv = HeteroConv({edge_type: GCNConv(hidden_channels, hidden_channels, add_self_loops=False)
+            #         for edge_type in _edge_types if edge_type[1] not in ['genemesh','rev_genemesh'] 
+            #         }, aggr='mean')
+            # self.convs.append(conv)
 
         # hetero convolute (gene --> mesh, mesh --> gene)
         self.gene_mesh_convs = torch.nn.ModuleList()
@@ -62,18 +66,28 @@ class HeteroGNN(torch.nn.Module):
         """
         edge_label_index_dict: supervision edge_index
         """
-        # Encoder 
-        # linear + relu + bn
-        x_dict = {key: self.embed[key](x) for key, x in x_dict.items()} 
-        
-        # convolute gene mesh net
+        # message
+        gx= self.embed['gene'](x_dict['gene'])
+        mx_dict = {'mesh': self.embed['mesh'](x_dict['mesh'])}
+        # x_dict = {key: self.embed[key](x) for key, x in x_dict.items()}
+        # for conv in self.convs:
+        #     x_dict = conv(mx_dict, edge_index_dict)
+        #     x_dict = {key: x.relu() for key, x in x_dict.items()} 
+                    
+        # mesh propgate, hetero conv, could be replace by RGCN
+        for mconv in self.mconvs:
+            mx_dict = mconv(mx_dict, edge_index_dict)
+            mx_dict = {key: x.relu() for key, x in mx_dict.items()}  # bn and dropout ?
+        # gene propogate, homogous conv
+        for gconv in self.gconvs:
+            gx = gconv(gx, edge_index_dict[('gene','ppi','gene')])
+            gx = F.relu(gx) # bn and dropout ?
+        # gene mesh  propogate, bipartile graph, conv carefully
+        ## FIXME: makesure the partile graph is correct format
+        x_dict = {'gene':gx, 'mesh': mx_dict['mesh']}
         for conv in self.gene_mesh_convs:
             x_dict = conv(x_dict, edge_index_dict)
             x_dict = {key: x.relu() for key, x in x_dict.items()}
-
-        for mconv in self.convs:
-            x_dict = mconv(x_dict, edge_index_dict)
-            x_dict = {key: x.relu() for key, x in x_dict.items()}   
   
         # FFN
         x_dict = {key: self.lin[key](x) for key, x in x_dict.items()} 

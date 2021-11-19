@@ -29,39 +29,39 @@ torch.manual_seed(seed=123456)
 os.makedirs(args.outdir, exist_ok=True)
 tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".human_genemesh_gnn")
 # # read data in
-print("Load Gene Mesh Graph")
-H = nx.read_gpickle(args.gene_mesh_graph) # note: H is undirected multigraph
+# print("Load Gene Mesh Graph")
+# H = nx.read_gpickle(args.gene_mesh_graph) # note: H is undirected multigraph
 
-# Load mesh embeddings
-print("Load embeddings")
-mesh_features = pd.read_csv(args.mesh_embed, index_col=0, header=None)
-gene_features = pd.read_csv(args.gene_embed, index_col=0, header=None)
-gene_features.index = gene_features.index.astype(str)
+# # Load mesh embeddings
+# print("Load embeddings")
+# mesh_features = pd.read_csv(args.mesh_embed, index_col=0, header=None)
+# gene_features = pd.read_csv(args.gene_embed, index_col=0, header=None)
+# gene_features.index = gene_features.index.astype(str)
 
-# print("Build GraphData")
-# # build data
-gm = GeneMeshData(H, gene_features, mesh_features)
-# # align 
-gm_data = gm()
-# save data for future use
-joblib.dump(gm_data, filename=os.path.join(args.outdir,"genemesh.data.pkl"))
-# # train test split
-train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
-                                         add_negative_train_samples=True, 
-                                         neg_sampling_ratio=1.0,
-                                         edge_types=('gene','genemesh','mesh'), # must be tuple, not list
-                                         rev_edge_types=('mesh','rev_genemesh','gene'))(gm_data)
-print("Save graph data")
-joblib.dump(train_data, filename=os.path.join(args.outdir,"train.data.pkl"))
-joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
-joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
+# # print("Build GraphData")
+# # # build data
+# gm = GeneMeshData(H, gene_features, mesh_features)
+# # # align 
+# gm_data = gm()
+# # save data for future use
+# joblib.dump(gm_data, filename=os.path.join(args.outdir,"genemesh.data.pkl"))
+# # # train test split
+# train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
+#                                          add_negative_train_samples=True, 
+#                                          neg_sampling_ratio=1.0,
+#                                          edge_types=('gene','genemesh','mesh'), # must be tuple, not list
+#                                          rev_edge_types=('mesh','rev_genemesh','gene'))(gm_data)
+# print("Save graph data")
+# joblib.dump(train_data, filename=os.path.join(args.outdir,"train.data.pkl"))
+# joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
+# joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
 
 print("Read graph data")
-# train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
-# val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
-# test_datat = joblib.load(os.path.join(args.outdir,"test.data.pkl"))
+train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
+val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
+##test_datat = joblib.load(os.path.join(args.outdir,"test.data.pkl"))
 ## init model
-model = HeteroGNN(heterodata=train_data, hidden_channels=512, num_layers=2)
+model = HeteroGNN(heterodata=train_data, hidden_channels=16, num_layers=2)
 print("Model")
 print(model)
 # config
@@ -144,7 +144,6 @@ best_val_loss = np.Inf
 train_data.to(device)
 val_data.to(device)
 model.to(device)
-
 
 print("Start training")
 for epoch in range(1, 1001):

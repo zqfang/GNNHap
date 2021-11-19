@@ -98,21 +98,19 @@ rule graph_build_edge:
     input: "human.gene_mesh_noedge.pkl"
     output: 
         "human_gene_mesh_dict.pkl",
-        WHOLE_GRAPH,
     run:
         G0 = joblib.load(input[0])
         G0.edge_add() # take a few hours to run
         joblib.dump(G0, filename=output[0])
-        G = G0.to_networkx()
-        nx.write_gpickle(G, path=output[1])
-
+        #G = G0.to_networkx()
+        #nx.write_gpickle(G, path=output[1])
 
 rule hetero_graph_build:
     input: 
         "human_gene_mesh_dict.pkl", 
         "BIOGRID-ALL-4.3.195.tab2.txt"
     output:
-        "human_ppi_undirected_edgelist.txt",
+        "human_gene_ppi_undirected_edgelist.txt",
         "mesh_edgelist.txt",
         "human_gene_mesh_hetero_nx.gpkl"
     shell:

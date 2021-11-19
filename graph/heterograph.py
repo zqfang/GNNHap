@@ -126,51 +126,64 @@ class MeshDAG:
         return mesh_graph
 
 
+class PPINetwork:
+    def __init__(self, database, genes, taxid=9606):
+        """
+        Args:
+            database: Biogrid database, "BIOGRID-ALL-4.3.195.tab2.txt"
+            genes: gene entrzid id in the graph 
+            taxid: Homo sapiens (taxid:9606), Mus musculus (taxid:10090) use Human
+        """
+        biogrid = pd.read_table(database, dtype=str)
+        # subset 
+        taxid = str(taxid)
+        biogrid = biogrid[(biogrid['Organism Interactor A'] == taxid) & (biogrid['Organism Interactor B'] == taxid)]
+        biogrid = biogrid[['#BioGRID Interaction ID',
+                            'Entrez Gene Interactor A','Entrez Gene Interactor B', 
+                            'Official Symbol Interactor A','Official Symbol Interactor B',
+                            'Experimental System','Experimental System Type']]
+        # select protein_coding gene and has physical interaction  
+        coding = sorted([str(g) for g in genes]) # convert string to int
+        biogrid_ms = biogrid[(biogrid['Entrez Gene Interactor A'].isin(coding)) & 
+                        (biogrid['Entrez Gene Interactor B'].isin(coding)) & 
+                        ( biogrid['Experimental System Type'] == 'physical')]
 
+        # databases
+        ppi = biogrid_ms.loc[:,['Entrez Gene Interactor A', 'Entrez Gene Interactor B', 'Experimental System Type']].astype(str)
+        ppi = ppi.drop_duplicates()
+        PPI = nx.from_pandas_edgelist(ppi, source='Entrez Gene Interactor A', 
+                                           target='Entrez Gene Interactor B', 
+                                           create_using=nx.DiGraph)
+        self.PPI = PPI.to_undirected(reciprocal=False)
+        # ppi_dict = {}
+        # for i, row in ppi.iterrows():
+        #     s = row.loc['Entrez Gene Interactor A']
+        #     t = row.loc['Entrez Gene Interactor B']
+        #     key = (s,t)
+        #     key_r = (t,s)
+        #     if (key in ppi_dict) or (key_r in ppi_dict):
+        #         continue
+        #     ppi_dict[(key)] = 1
 
-def build_ppi_network(database, gene_nodes, taxid=9606, out_edgelist=None):
-    """
-    Args:
-        database: Biogrid database, "BIOGRID-ALL-4.3.195.tab2.txt"
-        gene_nodes: gene entrzid id in the graph 
-        taxid: Homo sapiens (taxid:9606), Mus musculus (taxid:10090) use Human
-        out_edgelist: output file name for saving PPI edgelist. e.g. gene_ppi_undirected_edges.txt
-    Return:
-        nx.Graph of PPI network
-    """
-    ## PPI edge
-    biogrid = pd.read_table(database)
-    # subset 
-    biogrid = biogrid[(biogrid['Organism Interactor A'] == taxid) & (biogrid['Organism Interactor B'] == taxid)]
-    biogrid = biogrid[['#BioGRID Interaction ID',
-                        'Entrez Gene Interactor A','Entrez Gene Interactor B', 
-                        'Official Symbol Interactor A','Official Symbol Interactor B',
-                        'Experimental System','Experimental System Type']]
-    # select protein_coding gene and has physical interaction  
-    coding = sorted([int(g) for g in gene_nodes])
-    biogrid_ms = biogrid[(biogrid['Entrez Gene Interactor A'].isin(coding)) & 
-                    (biogrid['Entrez Gene Interactor B'].isin(coding)) & 
-                    ( biogrid['Experimental System Type'] == 'physical')]
+    def save_edgelist(self, outfile):
+        """
+        Args:
+            out_edgelist: output file name for saving PPI edgelist. e.g. gene_ppi_undirected_edges.txt
+        Return:
+            nx.Graph of PPI network
+        """
+        ## PPI edge
+        ppi = nx.to_pandas_edgelist(self.PPI)
+        ppi.to_csv(outfile, index=False, header=None, sep="\t")
 
-    # build PPI graph
-    ppi = biogrid_ms.loc[:,['Entrez Gene Interactor A', 'Entrez Gene Interactor B', 'Experimental System Type']].astype(str)
-    ppi = ppi.drop_duplicates()
-
-    ppi_dict = {}
-    for i, row in ppi.iterrows():
-        s = row.loc['Entrez Gene Interactor A']
-        t = row.loc['Entrez Gene Interactor B']
-        key = (s,t)
-        key_r = (t,s)
-        if (key in ppi_dict) or (key_r in ppi_dict):
-            continue
-        ppi_dict[(key)] = 1
-    PPI = nx.from_pandas_edgelist(ppi, source='Entrez Gene Interactor A', target='Entrez Gene Interactor B', create_using=nx.DiGraph)
-    PPI2 = PPI.to_undirected(reciprocal=False)
-    ppi2 = nx.to_pandas_edgelist(PPI2)
-    ppi2.to_csv(out_edgelist, index=False, header=None, sep="\t")
-    return PPI2 
-
+    def node2vec(self, out_embed="node2vec_ppi.txt"):
+        try:
+            from node2vec import Node2Vec
+            node2vec_ppi = Node2Vec(self.PPI, dimensions=64, walk_length=5, num_walks=25, workers=12)
+            model_ppi = node2vec_ppi.fit(window=7, min_count=1, batch_words=4)  
+            model_ppi.wv.save_word2vec_format(out_embed)
+        except:
+            return 
 
 
 if __name__ == "__main__":
@@ -223,22 +236,20 @@ if __name__ == "__main__":
     # nx.write_gpickle(H, path="human_gene_mesh_hetero_nx.tmp.gpkl")
     # H = nx.read_gpickle("human_gene_mesh_hetero_nx.tmp.gpkl")
     print("Build PPI")
-    PPI = build_ppi_network(database=IN_BIOGRID, 
-                            taxid=9906, 
-                            gene_nodes=genes,
-                            out_edgelist=OUT_PPI_EDGES)
+    ppnet = PPINetwork(database=IN_BIOGRID, taxid=9606, genes=genes)
+    ppnet.save_edgelist(OUT_PPI_EDGES)
     print("Add PPI Edges")
-    for edge_idx, (head, tail, edge_dict) in enumerate(PPI.edges(data=True)):
+    for edge_idx, (head, tail, edge_dict) in enumerate(ppnet.PPI.edges(data=True)):
         head = str(head)
         tail = str(tail)
-        H.add_edge(head, tail,  edge_type='ppi')
+        H.add_edge(head, tail, edge_type='ppi')
     print("Build MESH DAG")
     meshdag = MeshDAG(graph.mesh_nodes)
     mesh_graph = meshdag(outfile=OUT_MESH_GRAPH) # return a dataframe
     print("Add MESH Edges")
     for i, e in mesh_graph.iterrows():
         s, r, t = e
-        H.add_edge(s, t, edge_type=r)
+        H.add_edge(s, t, edge_type=r, key=r)
     # check isolated nodes, and remove them
     isonodes = list(nx.isolates(H))
     # remove isolated nodes
