@@ -36,29 +36,29 @@ mesh_features = pd.read_csv(args.mesh_embed, index_col=0, header=None)
 gene_features = pd.read_csv(args.gene_embed, index_col=0, header=None)
 gene_features.index = gene_features.index.astype(str)
 
-# print("Build GraphData")
-# # build data
-gm = GeneMeshData(H, gene_features, mesh_features)
-# # align 
-gm_data = gm()
-# save data for future use
-joblib.dump(gm_data, filename=os.path.join(args.outdir,"genemesh.data.pkl"))
-# # train test split
-train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
-                                         add_negative_train_samples=True, 
-                                         neg_sampling_ratio=1.0,
-                                         edge_types=('gene','genemesh','mesh'), # must be tuple, not list
-                                         rev_edge_types=('mesh','rev_genemesh','gene'))(gm_data)
-print("Save graph data")
-joblib.dump(train_data, filename=os.path.join(args.outdir,"train.data.pkl"))
-joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
-joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
+# # print("Build GraphData")
+# # # build data
+# gm = GeneMeshData(H, gene_features, mesh_features)
+# # # align 
+# gm_data = gm()
+# # save data for future use
+# joblib.dump(gm_data, filename=os.path.join(args.outdir,"genemesh.data.pkl"))
+# # # train test split
+# train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
+#                                          add_negative_train_samples=True, 
+#                                          neg_sampling_ratio=1.0,
+#                                          edge_types=('gene','genemesh','mesh'), # must be tuple, not list
+#                                          rev_edge_types=('mesh','rev_genemesh','gene'))(gm_data)
+# print("Save graph data")
+# joblib.dump(train_data, filename=os.path.join(args.outdir,"train.data.pkl"))
+# joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
+# joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
 
-#print("Read graph data")
-# train_data = joblib.load("checkpoints/train.data.20211114.pkl")
-# val_data = joblib.load("checkpoints/val.data.20211114.pkl")
-# test_datat = joblib.load("checkpoints/test.data.20211114.pkl")
-# init model
+print("Read graph data")
+train_data = joblib.load("checkpoints/train.data.20211114.pkl")
+val_data = joblib.load("checkpoints/val.data.20211114.pkl")
+test_datat = joblib.load("checkpoints/test.data.20211114.pkl")
+## init model
 model = HeteroGNN(heterodata=train_data, hidden_channels=512, num_layers=2)
 
 # config
@@ -155,7 +155,7 @@ for epoch in range(1, 1001):
     #scheduler.step()
     #lr = scheduler.get_last_lr()[0]
     #train_loss = loss.item()
-    train_loss = train(train_data, epoch, device)
+    train_loss = train(train_data, epoch)
     val_metrics = valid(val_data, device)  
     val_loss = val_metrics['val_loss']
     auroc = val_metrics['auroc']
