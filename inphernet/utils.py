@@ -125,7 +125,7 @@ def add_train_args():
     parser.add_argument("--gene_mesh_graph", type=str, default=None)
     parser.add_argument("--gene_embed", default=None, type=str, help="gene_embedding file")
     parser.add_argument("--mesh_embed", default=None, type=str, help="mesh_embedding file")
-    parser.add_argument("--node2index", default=None, type=str, help="gene or mesh's node index (json) file")
-    parser.add_argument("--outdir", type=str, default="checkpoints")
+    parser.add_argument("--hidden_size", default=256, type=int, help="hidden size of GNN")
+    parser.add_argument("--outdir", type=str, default="checkpoints") 
     args = parser.parse_args()
     return args

@@ -29,39 +29,40 @@ torch.manual_seed(seed=123456)
 os.makedirs(args.outdir, exist_ok=True)
 tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".human_genemesh_gnn")
 # # read data in
-# print("Load Gene Mesh Graph")
-# H = nx.read_gpickle(args.gene_mesh_graph) # note: H is undirected multigraph
+print("Load Gene Mesh Graph")
+H = nx.read_gpickle(args.gene_mesh_graph) # note: H is undirected multigraph
 
-# # Load mesh embeddings
-# print("Load embeddings")
-# mesh_features = pd.read_csv(args.mesh_embed, index_col=0, header=None)
-# gene_features = pd.read_csv(args.gene_embed, index_col=0, header=None)
-# gene_features.index = gene_features.index.astype(str)
+# Load mesh embeddings
+print("Load embeddings")
+mesh_features = pd.read_csv(args.mesh_embed, index_col=0, header=None)
+gene_features = pd.read_csv(args.gene_embed, index_col=0, header=None)
+gene_features.index = gene_features.index.astype(str)
 
-# # print("Build GraphData")
-# # # build data
-# gm = GeneMeshData(H, gene_features, mesh_features)
-# # # align 
-# gm_data = gm()
-# # save data for future use
-# joblib.dump(gm_data, filename=os.path.join(args.outdir,"genemesh.data.pkl"))
-# # # train test split
-# train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
-#                                          add_negative_train_samples=True, 
-#                                          neg_sampling_ratio=1.0,
-#                                          edge_types=('gene','genemesh','mesh'), # must be tuple, not list
-#                                          rev_edge_types=('mesh','rev_genemesh','gene'))(gm_data)
-# print("Save graph data")
-# joblib.dump(train_data, filename=os.path.join(args.outdir,"train.data.pkl"))
-# joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
-# joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
+# print("Build GraphData")
+# # build data
+gm = GeneMeshData(H, gene_features, mesh_features)
+# # align 
+gm_data = gm()
+# save data for future use
+joblib.dump(gm_data, filename=os.path.join(args.outdir,"genemesh.data.pkl"))
+# # train test split
+train_data, val_data, test_data = T.RandomLinkSplit(is_undirected=True, 
+                                         add_negative_train_samples=True, 
+                                         neg_sampling_ratio=1.0,
+                                         edge_types=('gene','genemesh','mesh'), # must be tuple, not list
+                                         rev_edge_types=('mesh','rev_genemesh','gene'))(gm_data)
+print("Save graph data")
+joblib.dump(train_data, filename=os.path.join(args.outdir,"train.data.pkl"))
+joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
+joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
 
 print("Read graph data")
-train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
-val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
+# train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
+# val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
 ##test_datat = joblib.load(os.path.join(args.outdir,"test.data.pkl"))
 ## init model
-model = HeteroGNN(heterodata=train_data, hidden_channels=16, num_layers=2)
+hidden_size = args.hidden_size
+model = HeteroGNN(heterodata=train_data, hidden_channels=hidden_size, num_layers=2)
 print("Model")
 print(model)
 # config
@@ -110,7 +111,11 @@ def valid(data: HeteroData, device='cpu'):
     val_loss = 0
     y = []
     y_preds = []
-    # 
+    # TODO: use MetricCollection
+    valid_ap = AveragePrecision(pos_label=1, compute_on_step=False)
+    valid_auroc = AUROC(pos_label=1, compute_on_step=False)
+    valid_acc = Accuracy(threshold=0.5, compute_on_step=False)
+
     h_dict = model(data.x_dict, data.edge_index_dict) # only need compute once for node_representations
     # minibatch testing for supervision links
     data_loader = DataLoader(torch.arange(edge_label.size(0)), batch_size=batch_size)
@@ -124,16 +129,19 @@ def valid(data: HeteroData, device='cpu'):
         loss = criterion(preds, targets) 
         #loss.backward()
         val_loss += loss.item()
-        y.append(targets)
-        y_preds.append(preds) 
+        y.append(targets.clone())
+        y_preds.append(preds.clone())
+        valid_ap(preds, targets)
+        valid_auroc(preds, targets)
+        valid_acc(preds, targets)
     val_loss /= len(data_loader)
     y_preds = torch.cat(y_preds, dim=0) # note the difference with torch.stack()
     y = torch.cat(y, dim=0).type(torch.LongTensor)
     y_preds = torch.sigmoid(y_preds)
-    ap = AveragePrecision(pos_label=1)(y_preds, y)
-    auroc = AUROC(pos_label=1)(y_preds, y)
-    acc = Accuracy(threshold=0.5)(y_preds, y)
-    return {'val_loss': val_loss.item(), 'acc': acc.item(), 'ap': ap.item(), 'auroc': auroc.item(), 'y':y.numpy(), 'y_preds': y_preds.numpy()}
+    ap = valid_ap.compute()
+    auroc = valid_auroc.compute()
+    acc = valid_acc.compute()
+    return {'val_loss': val_loss.item(), 'acc': acc, 'ap': ap, 'auroc': auroc, 'y':y.numpy(), 'y_preds': y_preds.numpy()}
 
 # release memory
 # del H
