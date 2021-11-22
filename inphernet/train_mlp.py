@@ -57,11 +57,6 @@ train_edge = train_edge[perm,:]
 perm = torch.randperm(valid_edge.shape[0])
 valid_edge = valid_edge[perm,:]
 
-# with open(args.node2index, 'r') as j:
-#     node2index = json.load(j)
-# idx2gene = {str(i): v for v, i in node2index['gene2index'].items() }
-# idx2mesh = {str(i): v for v, i in node2index['mesh2index'].items() }
-
 train_data = GeneMeshMLPDataset(train_edge, gene_features, mesh_features, train_data['nid2gene'], train_data['nid2mesh'])
 valid_data = GeneMeshMLPDataset(valid_edge, gene_features, mesh_features, valid_data['nid2gene'], valid_data['nid2mesh'])
 
@@ -115,11 +110,11 @@ epoch_start = min(epoch_start, num_epochs)
 last_valid_loss = np.Inf
 
 # Training the Model
-for epoch in range(epoch_start, num_epochs):
+for epoch in tqdm(range(epoch_start, num_epochs), desc='Epoch', position=0,):
     model.train()
     print("Training epoch: ", epoch, " time: ",  datetime.now(), file=sys.stderr)
     train_loss = 0.0
-    for batch, embeds  in enumerate(tqdm(train_loader, total=len(train_loader), desc='Train', position=0)):
+    for batch, embeds  in enumerate(tqdm(train_loader, total=len(train_loader), desc='Train', position=1, leave=True)):
         inputs, targets = embeds['embed'], embeds['target']
         inputs = inputs.to(device)
         targets = targets.view(-1).to(device)
@@ -140,8 +135,8 @@ for epoch in range(epoch_start, num_epochs):
         lr = scheduler.get_last_lr()[0]
         scheduler.step(epoch + batch / len(train_loader))
       
-        print('%s, epoch %d, step %5d, loss %.7f, lr %.7f' %
-                  (datetime.now(), epoch, batch + 1, loss.item(), lr), file=sys.stderr)
+        tqdm.write('%s, epoch %d, step %5d, loss %.7f, lr %.7f' %
+                  (datetime.now(), epoch, batch + 1, loss.item(), lr))
 
     train_loss /= len(train_loader)       
     # # Test the Model
@@ -153,7 +148,7 @@ for epoch in range(epoch_start, num_epochs):
     correct = 0
     y = []
     y_preds = []
-    print("Validation epoch: ", epoch, " time: ",  datetime.now(), file=sys.stderr)
+    tqdm.write(f"Validation epoch: {epoch}, time: {datetime.now()}")
     with torch.no_grad():
         for embeds in valid_loader:
             inputs, targets = embeds['embed'], embeds['target']
@@ -178,7 +173,7 @@ for epoch in range(epoch_start, num_epochs):
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': criterion,
                 }, PATH)
-        print(f"Save checkpoint to {PATH}", file=sys.stderr)
+        tqdm.write(f"Save checkpoint to {PATH}")
 
     # other metric
     y_preds = np.concatenate(y_preds)
@@ -188,7 +183,7 @@ for epoch in range(epoch_start, num_epochs):
     auc = roc_auc_score(y, y_preds)
     acc = accuracy_score(y > 0, y_preds > 0.5)
     apr = average_precision_score(y, y_preds)
-    print('Validation: epoch %4d, accuracy %.2f, pr %.2f, auc %.2f ' % (epoch, acc, apr, auc))
+    tqdm.write('Validation: epoch %4d, accuracy %.2f, pr %.2f, auc %.2f ' % (epoch, acc, apr, auc))
     tb.add_scalars('Loss', {'train':train_loss,
                              'valid':valid_loss}, epoch) 
     tb.add_scalar('LearningRate', lr, epoch) 
@@ -205,7 +200,7 @@ for epoch in range(epoch_start, num_epochs):
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': criterion,
                 }, PATH)
-        print(f"Save checkpoint to {PATH}", file=sys.stderr)
+        tqdm.write(f"Save checkpoint to {PATH}")
 
 
 tb.add_graph(model, inputs)
