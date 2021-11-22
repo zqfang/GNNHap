@@ -222,7 +222,12 @@ class GeneMeshData:
         # self.data['triplets'] = torch.from_numpy(self.triplets.loc[:,['head_idx','tail_idx','edge_type']].values)
 
 class GeneMeshMLPDataset(Dataset):
-    def __init__(self, edge_list, gene_embed, mesh_embed, idx2gene, idx2mesh, transform= "concat"):
+    def __init__(self, edge_list, 
+                    gene_embed: pd.DataFrame, 
+                    mesh_embed: pd.DataFrame, 
+                    idx2gene: Dict[int, str], 
+                    idx2mesh: Dict[int, str], 
+                    transform= "concat"):
         """
         Args:
             edge_list: Tensor shape (..., 3) it's bipartile graph !!! (gene, mesh, label)
@@ -259,8 +264,8 @@ class GeneMeshMLPDataset(Dataset):
         node1, node2 = [], []
         for i, data in enumerate(edges):
             n1, n2 = data[:2]
-            n1 = str(int(n1))
-            n2 = str(int(n2))
+            n1 = int(n1)
+            n2 = int(n2)
             node1.append(self.idx2gene[n1])
             node2.append(self.idx2mesh[n2])
         n1embed = self.gene_embed.loc[node1].values

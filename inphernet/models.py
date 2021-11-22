@@ -113,12 +113,12 @@ class HeteroGNN(torch.nn.Module):
 
 # model 2: multiPercepton
 class MLP(torch.nn.Module):
-    def __init__(self, input_size):
+    def __init__(self, input_size, hidden_size=1024):
         super(MLP,self).__init__()
         # number of hidden nodes in each layer (512)
         # input_size = 1900 + 768
-        hidden_1 = 1024
-        hidden_2 = 512
+        hidden_1 = hidden_size
+        hidden_2 = hidden_size // 2
         self.mlp = torch.nn.Sequential(torch.nn.Linear(input_size, hidden_1),    
                                     torch.nn.BatchNorm1d(hidden_1),
                                     torch.nn.ReLU(),

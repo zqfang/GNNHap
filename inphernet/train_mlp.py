@@ -15,7 +15,7 @@ from models import MLP
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import average_precision_score, roc_auc_score, accuracy_score
 from utils import add_train_args
-
+from tqdm.auto import tqdm
 
 # argument parser
 args = add_train_args()
@@ -28,18 +28,21 @@ tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".MLP", comment="basic
 # Parameters
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 input_size = 1900 + 768
-learning_rate = 0.01
-num_epochs = 1000
-
+#input_size = args.input_size 
+hidden_size = args.hidden_size # 1024
+num_epochs = args.num_epochs # 100
+batch_size = args.batch_size # 200000
+learning_rate = args.lr # 0.01
+num_workers = args.num_cpus # 6
 
 # Load mesh embeddings
 print("Load embeddings")
-mesh_features = pd.read_csv(args.mesh_embed, index_col=0)
+mesh_features = pd.read_csv(args.mesh_embed, index_col=0, header=None)
 gene_features = pd.read_csv(args.gene_embed, index_col=0, header=None)
 gene_features.index = gene_features.index.astype(str)
 
-train_data = joblib.load(os.path.join(args.outdir,"train.data.20211114.pkl"))
-valid_data = joblib.load(os.path.join(args.outdir,"val.data.20211114.pkl"))
+train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
+valid_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
 
 
 train_edge = torch.vstack([train_data['gene','genemesh','mesh'].edge_label_index, 
@@ -62,13 +65,13 @@ valid_edge = valid_edge[perm,:]
 train_data = GeneMeshMLPDataset(train_edge, gene_features, mesh_features, train_data['nid2gene'], train_data['nid2mesh'])
 valid_data = GeneMeshMLPDataset(valid_edge, gene_features, mesh_features, valid_data['nid2gene'], valid_data['nid2mesh'])
 
-train_loader = torch.utils.data.DataLoader(train_data, batch_size=200000, num_workers=6, shuffle=True)
-valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=200000, num_workers=6)
+train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=batch_size, num_workers=num_workers)
 
 
 
 print("Build Model", file=sys.stderr)
-model = MLP(input_size)
+model = MLP(input_size, hidden_size)
 model.to(device)
 print(model)
 # weight = [class_sample_count[0] / class_sample_count[1]]
@@ -79,7 +82,7 @@ optimizer = torch.optim.SGD(model.parameters(),
                             momentum=0.9, weight_decay=0.0005)  
 #scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [200, 500, 800], gamma=0.5)
 
-scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=50, T_mult=4, eta_min=1e-4)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=10, T_mult=2, eta_min=1e-4)
 '''
 以T_0=5, T_mult=1为例:
 T_0:学习率第一次回到初始值的epoch位置.
@@ -116,7 +119,7 @@ for epoch in range(epoch_start, num_epochs):
     model.train()
     print("Training epoch: ", epoch, " time: ",  datetime.now(), file=sys.stderr)
     train_loss = 0.0
-    for batch, embeds  in enumerate(train_loader):
+    for batch, embeds  in enumerate(tqdm(train_loader, total=len(train_loader), desc='Train', position=0)):
         inputs, targets = embeds['embed'], embeds['target']
         inputs = inputs.to(device)
         targets = targets.view(-1).to(device)
