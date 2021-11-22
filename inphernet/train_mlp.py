@@ -21,6 +21,7 @@ from tqdm.auto import tqdm
 args = add_train_args()
 torch.manual_seed(seed=123456)
 
+
 os.makedirs(args.outdir, exist_ok=True)
 tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".MLP", comment="basic_model")
 
