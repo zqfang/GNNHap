@@ -22,6 +22,7 @@ from tqdm.auto import tqdm
 
 # device
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+torch.set_num_threads(60)
 # argument parser
 args = add_train_args()
 torch.manual_seed(seed=123456)
@@ -62,6 +63,7 @@ val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
 ##test_datat = joblib.load(os.path.join(args.outdir,"test.data.pkl"))
 ## init model
 hidden_size = args.hidden_size
+batch_size = 100000
 model = HeteroGNN(heterodata=train_data, hidden_channels=hidden_size, num_layers=2)
 print("Model")
 print(model)
@@ -74,7 +76,6 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=5
 def train(epoch, device='cpu'):
     #train_data.to(device)
     model.train()
-    batch_size=10000
     edge_label_index = train_data['gene','genemesh','mesh'].edge_label_index
     edge_label = train_data['gene','genemesh','mesh'].edge_label
     # minibatch training for supervision links
@@ -103,7 +104,6 @@ def train(epoch, device='cpu'):
 def valid(epoch, device='cpu'):
     model.eval()
     #data.to(device)
-    batch_size=10000
     # supervision links
     edge_label_index = val_data['gene','genemesh','mesh'].edge_label_index
     edge_label = val_data['gene','genemesh','mesh'].edge_label
@@ -118,7 +118,7 @@ def valid(epoch, device='cpu'):
 
     h_dict = model(val_data.x_dict, val_data.edge_index_dict) # only need compute once for node_representations
     # minibatch testing for supervision links
-    data_loader = DataLoader(torch.arange(edge_label.size(0)), batch_size=batch_size)
+    data_loader = DataLoader(torch.arange(edge_label.size(0)), batch_size=batch_size, num_workers=24)
     for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Valid')):
         g = h_dict['gene'][edge_label_index[0, perm]] 
         m = h_dict['mesh'][edge_label_index[1, perm]]
