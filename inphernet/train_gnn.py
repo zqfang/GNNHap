@@ -81,7 +81,7 @@ def train(epoch, device='cpu'):
     # minibatch training for supervision links
     data_loader = DataLoader(torch.arange(edge_label.size(0)), batch_size=batch_size, shuffle=True)
     train_loss = 0
-    for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Train', position=0)):
+    for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Train', leave=True, position=1)):
         optimizer.zero_grad()
         h_dict = model(train_data.x_dict, train_data.edge_index_dict)
         g = h_dict['gene'][edge_label_index[0, perm]]
@@ -95,7 +95,7 @@ def train(epoch, device='cpu'):
         scheduler.step(epoch + i / len(data_loader)) # so, each mini-batch will have different learning rate
         train_loss += loss.item()
         lr = scheduler.get_last_lr()[0] 
-        print(f'{datetime.now()}  Epoch: {epoch:03d}, Step: {i}, Train Loss: {loss.item():.7f}, Learning rate: {lr:.7f}')  
+        tqdm.write(f'{datetime.now()}  Epoch: {epoch:03d}, Step: {i}, Train Loss: {loss.item():.7f}, Learning rate: {lr:.7f}')  
     train_loss /= len(data_loader)
     return  train_loss
 
@@ -119,7 +119,7 @@ def valid(epoch, device='cpu'):
     h_dict = model(val_data.x_dict, val_data.edge_index_dict) # only need compute once for node_representations
     # minibatch testing for supervision links
     data_loader = DataLoader(torch.arange(edge_label.size(0)), batch_size=batch_size, num_workers=24)
-    for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Valid')):
+    for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Valid', position=1, leave=True)):
         g = h_dict['gene'][edge_label_index[0, perm]] 
         m = h_dict['mesh'][edge_label_index[1, perm]]
         targets = edge_label[perm]
@@ -154,14 +154,14 @@ val_data.to(device)
 model.to(device)
 
 print("Start training")
-for epoch in range(1, 101):
+for epoch in tqdm(range(0, num_epochs), total=num_epochs, position=0, desc='Epoch'):
     train_loss = train(epoch)
     val_metrics = valid(epoch)  
     val_loss = val_metrics['val_loss']
     auroc = val_metrics['auroc']
     ap = val_metrics['auroc']
     acc = val_metrics['acc']
-    print(f'{datetime.now()}  Epoch: {epoch:03d}, Train Loss: {train_loss:.7f}, Val Loss: {val_loss:.7f}, Val ROC: {auroc:.4f}, Val PR: {ap:.3f}, Val Acc: {acc:.7f}')
+    tqdm.write(f'{datetime.now()}  Epoch: {epoch:03d}, Train Loss: {train_loss:.7f}, Val Loss: {val_loss:.7f}, Val ROC: {auroc:.4f}, Val PR: {ap:.3f}, Val Acc: {acc:.7f}')
     tb.add_scalar('Loss', {'train': train_loss, 'valid': val_loss}, epoch) 
     tb.add_scalar('Valid', {'ap': ap, 'auroc': auroc, 'acc':acc}, epoch) 
     tb.add_pr_curve("Precision-Recall", val_metrics['y'], val_metrics['y_preds'], epoch)

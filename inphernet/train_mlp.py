@@ -111,9 +111,9 @@ epoch_start = min(epoch_start, num_epochs)
 last_valid_loss = np.Inf
 
 # Training the Model
-for epoch in tqdm(range(epoch_start, num_epochs), desc='Epoch', position=0,):
+for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, desc='Epoch', position=0,):
     model.train()
-    print("Training epoch: ", epoch, " time: ",  datetime.now(), file=sys.stderr)
+    tqdm.write(f"Training epoch: {epoch}, time: {datetime.now()}")
     train_loss = 0.0
     for batch, embeds  in enumerate(tqdm(train_loader, total=len(train_loader), desc='Train', position=1, leave=True)):
         inputs, targets = embeds['embed'], embeds['target']
@@ -151,7 +151,7 @@ for epoch in tqdm(range(epoch_start, num_epochs), desc='Epoch', position=0,):
     y_preds = []
     tqdm.write(f"Validation epoch: {epoch}, time: {datetime.now()}")
     with torch.no_grad():
-        for embeds in valid_loader:
+        for embeds in tqdm(valid_loader, total=len(valid_loader), desc='Train', position=1, leave=True):
             inputs, targets = embeds['embed'], embeds['target']
             inputs = inputs.to(device)
             targets = targets.view(-1).to(device)
