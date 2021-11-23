@@ -62,8 +62,9 @@ train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
 val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
 ##test_datat = joblib.load(os.path.join(args.outdir,"test.data.pkl"))
 ## init model
+num_epochs = args.num_epochs
 hidden_size = args.hidden_size
-batch_size = 100000
+batch_size = 100000 # args.batch_size
 model = HeteroGNN(heterodata=train_data, hidden_channels=hidden_size, num_layers=2)
 print("Model")
 print(model)
@@ -71,7 +72,7 @@ print(model)
 criterion = torch.nn.BCEWithLogitsLoss() #
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=1e-4)
 #scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [200, 500, 800], gamma=0.5)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=50, T_mult=4, eta_min=1e-4)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=10, T_mult=2, eta_min=1e-4)
 
 def train(epoch, device='cpu'):
     #train_data.to(device)
