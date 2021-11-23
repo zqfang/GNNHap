@@ -64,7 +64,7 @@ val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
 ## init model
 num_epochs = args.num_epochs
 hidden_size = args.hidden_size
-batch_size = 100000 # args.batch_size
+batch_size = args.batch_size # 10000
 model = HeteroGNN(heterodata=train_data, hidden_channels=hidden_size, num_layers=2)
 print("Model")
 print(model)
