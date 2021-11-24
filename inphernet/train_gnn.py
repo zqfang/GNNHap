@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torch_geometric.data import HeteroData
 from torchmetrics import AveragePrecision, Accuracy, AUROC
+from sklearn.metrics import average_precision_score, roc_auc_score, accuracy_score
 from data import GeneMeshData
 from models import HeteroGNN
 from utils import add_train_args
@@ -68,6 +69,10 @@ batch_size = args.batch_size # 10000
 model = HeteroGNN(heterodata=train_data, hidden_channels=hidden_size, num_layers=2)
 print("Model")
 print(model)
+# move data to GPU
+train_data.to(device)
+val_data.to(device)
+model.to(device)
 # config
 criterion = torch.nn.BCEWithLogitsLoss() #
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=1e-4)
@@ -88,6 +93,7 @@ def train(epoch, device='cpu'):
         g = h_dict['gene'][edge_label_index[0, perm]]
         m = h_dict['mesh'][edge_label_index[1, perm]]
         targets = edge_label[perm]
+        targets = targets.to(device)
         inp = torch.cat([g, m], dim=1) # note the dim
         preds = model.link_predictor(inp)
         loss = criterion(preds.view(-1), targets) 
@@ -113,36 +119,40 @@ def valid(epoch, device='cpu'):
     y = []
     y_preds = []
     # TODO: use MetricCollection
-    valid_ap = AveragePrecision(pos_label=1, compute_on_step=False)
-    valid_auroc = AUROC(pos_label=1, compute_on_step=False)
-    valid_acc = Accuracy(threshold=0.5, compute_on_step=False)
+    # valid_ap = AveragePrecision(pos_label=1, compute_on_step=False)
+    # valid_auroc = AUROC(pos_label=1, compute_on_step=False)
+    # valid_acc = Accuracy(threshold=0.5, compute_on_step=False)
 
-    h_dict = model(val_data.x_dict, val_data.edge_index_dict) # only need compute once for node_representations
+    h_dict = model(val_data.x_dict, val_data.edge_index_dict).to(device) # only need compute once for node_representations
     # minibatch testing for supervision links
-    data_loader = DataLoader(torch.arange(edge_label.size(0)), batch_size=batch_size, num_workers=24)
+    data_loader = DataLoader(torch.arange(edge_label.size(0)), batch_size=batch_size)
     for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Valid', position=1, leave=True)):
         g = h_dict['gene'][edge_label_index[0, perm]] 
         m = h_dict['mesh'][edge_label_index[1, perm]]
         targets = edge_label[perm]
+        targets = targets.type(torch.LongTensor).to(device)
         # NOTE: concat here
-        inp = torch.cat([g, m], dim=1)
+        inp = torch.cat([g, m], dim=1).to(device)
         preds = model.link_predictor(inp).view(-1)
         loss = criterion(preds, targets) 
         #loss.backward()
         val_loss += loss.item()
-        y.append(targets.clone())
-        y_preds.append(preds.clone())
-        valid_ap(preds, targets)
-        valid_auroc(preds, targets)
-        valid_acc(preds, targets)
+        y.append(targets.cpu())
+        y_preds.append(preds.cpu())
+        # valid_ap(preds, targets)
+        # valid_auroc(preds, targets)
+        # valid_acc(preds, targets)
     val_loss /= len(data_loader)
     y_preds = torch.cat(y_preds, dim=0) # note the difference with torch.stack()
-    y = torch.cat(y, dim=0).type(torch.LongTensor)
-    y_preds = torch.sigmoid(y_preds)
-    ap = valid_ap.compute()
-    auroc = valid_auroc.compute()
-    acc = valid_acc.compute()
-    return {'val_loss': val_loss.item(), 'acc': acc, 'ap': ap, 'auroc': auroc, 'y':y.numpy(), 'y_preds': y_preds.numpy()}
+    y = torch.cat(y, dim=0).type(torch.LongTensor).numpy()
+    y_preds = torch.sigmoid(y_preds).numpy()
+    # ap = valid_ap.compute()
+    # auroc = valid_auroc.compute()
+    # acc = valid_acc.compute()
+    auroc = roc_auc_score(y, y_preds)
+    acc = accuracy_score(y > 0, y_preds > 0.5)
+    ap = average_precision_score(y, y_preds)
+    return {'val_loss': val_loss.item(), 'acc': acc, 'ap': ap, 'auroc': auroc, 'y':y, 'y_preds': y_preds}
 
 # release memory
 # del H
@@ -150,14 +160,10 @@ def valid(epoch, device='cpu'):
 # gc.collect()
 ## Trainining
 best_val_loss = np.Inf
-train_data.to(device)
-val_data.to(device)
-model.to(device)
-
 print("Start training")
 for epoch in tqdm(range(0, num_epochs), total=num_epochs, position=0, desc='Epoch'):
-    train_loss = train(epoch)
-    val_metrics = valid(epoch)  
+    train_loss = train(epoch, device)
+    val_metrics = valid(epoch, device)  
     val_loss = val_metrics['val_loss']
     auroc = val_metrics['auroc']
     ap = val_metrics['auroc']
