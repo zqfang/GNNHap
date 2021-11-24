@@ -28,7 +28,7 @@ args = add_train_args()
 torch.manual_seed(seed=123456)
 
 os.makedirs(args.outdir, exist_ok=True)
-tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".human_genemesh_gnn")
+tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".GNN")
 # # # read data in
 # print("Load Gene Mesh Graph")
 # H = nx.read_gpickle(args.gene_mesh_graph) # note: H is undirected multigraph
