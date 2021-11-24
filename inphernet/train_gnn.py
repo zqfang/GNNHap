@@ -102,7 +102,7 @@ def train(epoch, device='cpu'):
         scheduler.step(epoch + i / len(data_loader)) # so, each mini-batch will have different learning rate
         train_loss += loss.item()
         lr = scheduler.get_last_lr()[0] 
-        tqdm.write(f'{datetime.now()}  Epoch: {epoch:03d}, Step: {i}, Train Loss: {loss.item():.7f}, Learning rate: {lr:.7f}')  
+        tqdm.write(f'{datetime.now():%Y-%m-%d %H:%M:%S}  Epoch: {epoch:03d}, Step: {i}, Train Loss: {loss.item():.7f}, Learning rate: {lr:.7f}')  
     train_loss /= len(data_loader)
     return  train_loss
 
@@ -154,36 +154,53 @@ def valid(epoch, device='cpu'):
     ap = average_precision_score(y, y_preds)
     return {'val_loss': val_loss.item(), 'acc': acc, 'ap': ap, 'auroc': auroc, 'y':y, 'y_preds': y_preds}
 
-# release memory
-# del H
-# del gm_data
-# gc.collect()
+
+
+epoch_start = 0
+ckpts = os.path.join(args.outdir, f"gnn_{hidden_size}_best_model.pt")
+if os.path.exists(ckpts):
+    tqdm.write(f"Loading checkpoints .... {datetime.now():%Y-%m-%d %H:%M:%S}")
+    checkpoint = torch.load(ckpts)
+    # load model weights state_dict
+    model.load_state_dict(checkpoint['model_state_dict'])
+    tqdm.write('Previously trained model weights state_dict loaded...')
+    # load trained optimizer state_dict
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    tqdm.write('Previously trained optimizer state_dict loaded...')
+    epoch_start = checkpoint['epoch']+1
+    # load the criterion
+    # criterion = checkpoint['loss']
+    tqdm.write('Trained model loss function loaded...')
 ## Trainining
 best_val_loss = np.Inf
-print("Start training")
-for epoch in tqdm(range(0, num_epochs), total=num_epochs, position=0, desc='Epoch'):
+epoch_start= min(epoch_start, num_epochs)
+
+tqdm.write("Start training")
+for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, position=0, desc='Epoch'):
     train_loss = train(epoch, device)
+    # save every epoch
+    torch.save({'state_dict': model.state_dict(),
+        'epoch': epoch, 'hidden_size': hidden_size, 'batch_size': batch_size}, 
+        os.path.join(args.outdir, f'gnn_{hidden_size}_epoch{epoch}.pt'))
+    # validation
     val_metrics = valid(epoch, device)  
     val_loss = val_metrics['val_loss']
     auroc = val_metrics['auroc']
     ap = val_metrics['auroc']
     acc = val_metrics['acc']
-    tqdm.write(f'{datetime.now()}  Epoch: {epoch:03d}, Train Loss: {train_loss:.7f}, Val Loss: {val_loss:.7f}, Val ROC: {auroc:.4f}, Val PR: {ap:.3f}, Val Acc: {acc:.7f}')
+    tqdm.write(f'{datetime.now():%Y-%m-%d %H:%M:%S}  Epoch: {epoch:03d}, Train Loss: {train_loss:.7f}, Val Loss: {val_loss:.7f}, Val ROC: {auroc:.4f}, Val PR: {ap:.3f}, Val Acc: {acc:.7f}')
+    # tensorboard
     tb.add_scalar('Loss', {'train': train_loss, 'valid': val_loss}, epoch) 
     tb.add_scalar('Valid', {'ap': ap, 'auroc': auroc, 'acc':acc}, epoch) 
     tb.add_pr_curve("Precision-Recall", val_metrics['y'], val_metrics['y_preds'], epoch)
-
+    # get best model
     if val_loss <= best_val_loss:
         best_val_loss = val_loss
         best_epoch = epoch
         torch.save({'state_dict': model.state_dict(),
                     'epoch': epoch, 'hidden_size': hidden_size, 'batch_size': batch_size}, 
-                    os.path.join(args.outdir, 'gnn_best_model.pt'))
-    # save every epoch
-    torch.save({'state_dict': model.state_dict(),
-        'epoch': epoch, 'hidden_size': hidden_size, 'batch_size': batch_size}, 
-        os.path.join(args.outdir, f'gnn_epoch_{epoch}.pt'))
+                    os.path.join(args.outdir, 'gnn_{hidden_size}_best_model.pt'))
 # finish training
 tb.close()
 #
-print(f'{datetime.now()}: Done Training ')
+tqdm.write(f'{datetime.now():%Y-%m-%d %H:%M:%S}: Done Training ')
