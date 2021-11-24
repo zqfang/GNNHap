@@ -1,10 +1,15 @@
+'''
+see subsampling big graph link prediction task, so we could fit in GPUs
+https://github.com/snap-stanford/ogb/blob/master/examples/linkproppred/citation2/sampler.py#L17-L41
 
+use NeigborLoader when graph could not fit in your GPU
+'''
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from torch_geometric.data import NeighborSampler
+from torch_geometric.data import NeighborSampler, NeighorLoader
 
 
 class PositiveLinkNeighborSampler(NeighborSampler):
@@ -32,3 +37,6 @@ class NegativeLinkNeighborSampler(NeighborSampler):
         batch = torch.randint(0, num_nodes, (2 * len(edge_idx), ),
                               dtype=torch.long)
         return super(NegativeLinkNeighborSampler, self).sample(batch)
+
+
+

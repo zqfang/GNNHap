@@ -172,11 +172,11 @@ for epoch in tqdm(range(0, num_epochs), total=num_epochs, position=0, desc='Epoc
         best_epoch = epoch
         torch.save({'state_dict': model.state_dict(),
                     'epoch': epoch}, 
-                    os.path.join(args.outdir, 'human_gene_mesh_best_model.pt'))
-    if epoch % 20 == 0:
-        torch.save({'state_dict': model.state_dict(),
-            'epoch': epoch}, 
-            os.path.join(args.outdir, f'human_gene_mesh_epoch_{epoch}_model.pt'))
+                    os.path.join(args.outdir, 'gnn_best_model.pt'))
+    # save every epoch
+    torch.save({'state_dict': model.state_dict(),
+        'epoch': epoch}, 
+        os.path.join(args.outdir, f'gnn_epoch_{epoch}.pt'))
 # finish training
 tb.close()
 #

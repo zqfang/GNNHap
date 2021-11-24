@@ -227,7 +227,8 @@ class GeneMeshMLPDataset(Dataset):
                     mesh_embed: pd.DataFrame, 
                     idx2gene: Dict[int, str], 
                     idx2mesh: Dict[int, str], 
-                    transform= "concat"):
+                    transform= "concat",
+                    test: bool = False):
         """
         Args:
             edge_list: Tensor shape (..., 3) it's bipartile graph !!! (gene, mesh, label)
@@ -237,6 +238,7 @@ class GeneMeshMLPDataset(Dataset):
             idx2mesh: edge_index to Mesh UID
             transform (optional): Optional transform to be applied on a sample.
         """
+        self._test = test
         self.transform = transform
         self.edge_list = edge_list.numpy()
         self.gene_embed = gene_embed
@@ -257,10 +259,7 @@ class GeneMeshMLPDataset(Dataset):
             index = index.tolist()
         if isinstance(index, int):
             index = [index]
-        edges = self.edge_list[index,:]
-        # NOTE: y should be 0,1,2,3... not one-hot encoding
-        y = edges[:,2] # Float tensor for cross entropy
-        
+        edges = self.edge_list[index,:]        
         node1, node2 = [], []
         for i, data in enumerate(edges):
             n1, n2 = data[:2]
@@ -281,6 +280,9 @@ class GeneMeshMLPDataset(Dataset):
         #    embed = torch.cdist(node1, node2, p=2)
         else:
             raise Exception("transform input error")
-           
-        return {'embed': torch.from_numpy(embed.astype(np.float32)).squeeze(), 
-                'target': torch.from_numpy(y.astype(np.float32))}
+        if not self._test:
+            # NOTE: y should be 0,1,2,3... not one-hot encoding
+            y = edges[:,2] # Float tensor for cross entropy           
+            return {'embed': torch.from_numpy(embed.astype(np.float32)).squeeze(), 
+                    'target': torch.from_numpy(y.astype(np.float32))}
+        return {'embed': torch.from_numpy(embed.astype(np.float32)).squeeze()}
