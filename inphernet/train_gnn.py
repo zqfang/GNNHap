@@ -154,7 +154,29 @@ def valid(epoch, device='cpu'):
     ap = average_precision_score(y, y_preds)
     return {'val_loss': val_loss, 'acc': acc, 'ap': ap, 'auroc': auroc, 'y':y, 'y_preds': y_preds}
 
-
+@torch.no_grad()
+def predict(data: HeteroData, node_embed=None, device='cpu'):
+    model.eval()
+    data.to(device)
+    ####
+    y_preds = []
+    if node_embed is None:
+        h_dict = model(val_data.x_dict, val_data.edge_index_dict) # only need compute once for node_representations
+    else:
+        h_dict = node_embed
+    
+    edge_label_index = data['gene','genemesh','mesh'].edge_label_index
+    data_loader = DataLoader(torch.arange(edge_label_index.size(0)), batch_size=batch_size)
+    for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Predict', position=1, leave=True)):
+        g = h_dict['gene'][edge_label_index[0, perm]] 
+        m = h_dict['mesh'][edge_label_index[1, perm]]
+        # NOTE: concat here
+        inp = torch.cat([g, m], dim=1).to(device)
+        preds = model.link_predictor(inp).view(-1)
+        y_preds.append(preds.cpu())
+    y_preds = torch.cat(y_preds, dim=0) # note the difference with torch.stack()
+    y_preds = torch.sigmoid(y_preds).numpy()
+    return y_preds, h_dict
 
 epoch_start = 0
 ckpts = os.path.join(args.outdir, f"gnn_{hidden_size}_best_model.pt")
@@ -187,8 +209,8 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, position=0, 
     acc = val_metrics['acc']
     tqdm.write(f'{datetime.now():%Y-%m-%d %H:%M:%S}  Epoch: {epoch:03d}, Train Loss: {train_loss:.7f}, Val Loss: {val_loss:.7f}, Val ROC: {auroc:.4f}, Val PR: {ap:.3f}, Val Acc: {acc:.7f}')
     # tensorboard
-    tb.add_scalar('Loss', {'train': train_loss, 'valid': val_loss}, epoch) 
-    tb.add_scalar('Valid', {'ap': ap, 'auroc': auroc, 'acc':acc}, epoch) 
+    tb.add_scalars('Loss', {'train': train_loss, 'valid': val_loss}, epoch) 
+    tb.add_scalars('Valid', {'ap': ap, 'auroc': auroc, 'acc':acc}, epoch) 
     tb.add_pr_curve("Precision-Recall", val_metrics['y'], val_metrics['y_preds'], epoch)
     # get best model
     if val_loss <= best_val_loss:
