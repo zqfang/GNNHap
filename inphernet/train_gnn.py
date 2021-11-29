@@ -130,7 +130,7 @@ def valid(epoch, device='cpu'):
         g = h_dict['gene'][edge_label_index[0, perm]] 
         m = h_dict['mesh'][edge_label_index[1, perm]]
         targets = edge_label[perm]
-        targets = targets.type(torch.LongTensor).to(device)
+        targets = targets.to(device)
         # NOTE: concat here
         inp = torch.cat([g, m], dim=1).to(device)
         preds = model.link_predictor(inp).view(-1)
