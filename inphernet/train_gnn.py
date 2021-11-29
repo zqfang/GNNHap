@@ -152,7 +152,7 @@ def valid(epoch, device='cpu'):
     auroc = roc_auc_score(y, y_preds)
     acc = accuracy_score(y > 0, y_preds > 0.5)
     ap = average_precision_score(y, y_preds)
-    return {'val_loss': val_loss.item(), 'acc': acc, 'ap': ap, 'auroc': auroc, 'y':y, 'y_preds': y_preds}
+    return {'val_loss': val_loss, 'acc': acc, 'ap': ap, 'auroc': auroc, 'y':y, 'y_preds': y_preds}
 
 
 
