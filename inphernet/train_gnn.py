@@ -123,7 +123,7 @@ def valid(epoch, device='cpu'):
     # valid_auroc = AUROC(pos_label=1, compute_on_step=False)
     # valid_acc = Accuracy(threshold=0.5, compute_on_step=False)
 
-    h_dict = model(val_data.x_dict, val_data.edge_index_dict).to(device) # only need compute once for node_representations
+    h_dict = model(val_data.x_dict, val_data.edge_index_dict) # only need compute once for node_representations
     # minibatch testing for supervision links
     data_loader = DataLoader(torch.arange(edge_label.size(0)), batch_size=batch_size)
     for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Valid', position=1, leave=True)):
