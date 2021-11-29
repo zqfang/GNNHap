@@ -164,9 +164,6 @@ if os.path.exists(ckpts):
     # load model weights state_dict
     model.load_state_dict(checkpoint['model_state_dict'])
     tqdm.write('Previously trained model weights state_dict loaded...')
-    # load trained optimizer state_dict
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    tqdm.write('Previously trained optimizer state_dict loaded...')
     epoch_start = checkpoint['epoch']+1
     # load the criterion
     # criterion = checkpoint['loss']
