@@ -58,7 +58,7 @@ tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".GNN")
 # joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
 # joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
 
-print("Read graph data")
+tqdm.write("Read graph data")
 train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
 val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
 ##test_datat = joblib.load(os.path.join(args.outdir,"test.data.pkl"))
@@ -67,7 +67,7 @@ num_epochs = args.num_epochs
 hidden_size = args.hidden_size
 batch_size = args.batch_size # 10000
 model = HeteroGNN(heterodata=train_data, hidden_channels=hidden_size, num_layers=2)
-print("Model")
+tqdm.write("Model")
 print(model)
 # move data to GPU
 train_data.to(device)
@@ -178,20 +178,23 @@ def predict(data: HeteroData, node_embed=None, device='cpu'):
     y_preds = torch.sigmoid(y_preds).numpy()
     return y_preds, h_dict
 
+
+## Trainining
+best_val_loss = np.Inf
 epoch_start = 0
 ckpts = os.path.join(args.outdir, f"gnn_{hidden_size}_best_model.pt")
 if os.path.exists(ckpts):
     tqdm.write(f"Loading checkpoints .... {datetime.now():%Y-%m-%d %H:%M:%S}")
     checkpoint = torch.load(ckpts)
     # load model weights state_dict
-    model.load_state_dict(checkpoint['model_state_dict'])
+    model.load_state_dict(checkpoint['state_dict'])
     tqdm.write('Previously trained model weights state_dict loaded...')
     epoch_start = checkpoint['epoch']+1
+    #best_val_loss = checkpoint['val_loss']
     # load the criterion
     # criterion = checkpoint['loss']
     tqdm.write('Trained model loss function loaded...')
-## Trainining
-best_val_loss = np.Inf
+
 epoch_start= min(epoch_start, num_epochs)
 
 tqdm.write("Start training")
@@ -199,7 +202,9 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, position=0, 
     train_loss = train(epoch, device)
     # save every epoch
     torch.save({'state_dict': model.state_dict(),
-        'epoch': epoch, 'hidden_size': hidden_size, 'batch_size': batch_size}, 
+        'epoch': epoch, 
+        'hidden_size': hidden_size, 
+        'batch_size': batch_size}, 
         os.path.join(args.outdir, f'gnn_{hidden_size}_epoch{epoch}.pt'))
     # validation
     val_metrics = valid(epoch, device)  
@@ -217,7 +222,10 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, position=0, 
         best_val_loss = val_loss
         best_epoch = epoch
         torch.save({'state_dict': model.state_dict(),
-                    'epoch': epoch, 'hidden_size': hidden_size, 'batch_size': batch_size}, 
+                    'epoch': epoch, 
+                    'hidden_size': hidden_size, 
+                    'batch_size': batch_size,
+                    'val_loss': val_loss}, 
                     os.path.join(args.outdir, 'gnn_{hidden_size}_best_model.pt'))
 # finish training
 tb.close()
