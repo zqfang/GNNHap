@@ -161,7 +161,7 @@ def predict(data: HeteroData, node_embed=None, device='cpu'):
     ####
     y_preds = []
     if node_embed is None:
-        h_dict = model(val_data.x_dict, val_data.edge_index_dict) # only need compute once for node_representations
+        h_dict = model(data.x_dict, data.edge_index_dict) # only need compute once for node_representations
     else:
         h_dict = node_embed
     
@@ -205,7 +205,7 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, position=0, 
         'epoch': epoch, 
         'hidden_size': hidden_size, 
         'batch_size': batch_size}, 
-        os.path.join(args.outdir, f'gnn_{hidden_size}_epoch{epoch}.pt'))
+        os.path.join(args.outdir, f'gnn_{hidden_size}_epoch{epoch:03d}.pt'))
     # validation
     val_metrics = valid(epoch, device)  
     val_loss = val_metrics['val_loss']
@@ -226,7 +226,7 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, position=0, 
                     'hidden_size': hidden_size, 
                     'batch_size': batch_size,
                     'val_loss': val_loss}, 
-                    os.path.join(args.outdir, 'gnn_{hidden_size}_best_model.pt'))
+                    os.path.join(args.outdir, f'gnn_{hidden_size}_best_model.pt'))
 # finish training
 tb.close()
 #
