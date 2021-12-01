@@ -58,7 +58,7 @@ tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".GNN")
 # joblib.dump(val_data, filename=os.path.join(args.outdir,"val.data.pkl"))
 # joblib.dump(test_data, filename=os.path.join(args.outdir,"test.data.pkl"))
 
-print("Read graph data")
+tqdm.write("Read graph data")
 train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
 val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
 ##test_datat = joblib.load(os.path.join(args.outdir,"test.data.pkl"))
@@ -67,7 +67,7 @@ num_epochs = args.num_epochs
 hidden_size = args.hidden_size
 batch_size = args.batch_size # 10000
 model = HeteroGNN(heterodata=train_data, hidden_channels=hidden_size, num_layers=2)
-print("Model")
+tqdm.write("Model")
 print(model)
 # move data to GPU
 train_data.to(device)
@@ -130,7 +130,7 @@ def valid(epoch, device='cpu'):
         g = h_dict['gene'][edge_label_index[0, perm]] 
         m = h_dict['mesh'][edge_label_index[1, perm]]
         targets = edge_label[perm]
-        targets = targets.type(torch.LongTensor).to(device)
+        targets = targets.to(device)
         # NOTE: concat here
         inp = torch.cat([g, m], dim=1).to(device)
         preds = model.link_predictor(inp).view(-1)
@@ -152,27 +152,49 @@ def valid(epoch, device='cpu'):
     auroc = roc_auc_score(y, y_preds)
     acc = accuracy_score(y > 0, y_preds > 0.5)
     ap = average_precision_score(y, y_preds)
-    return {'val_loss': val_loss.item(), 'acc': acc, 'ap': ap, 'auroc': auroc, 'y':y, 'y_preds': y_preds}
+    return {'val_loss': val_loss, 'acc': acc, 'ap': ap, 'auroc': auroc, 'y':y, 'y_preds': y_preds}
+
+@torch.no_grad()
+def predict(data: HeteroData, node_embed=None, device='cpu'):
+    model.eval()
+    data.to(device)
+    ####
+    y_preds = []
+    if node_embed is None:
+        h_dict = model(data.x_dict, data.edge_index_dict) # only need compute once for node_representations
+    else:
+        h_dict = node_embed
+    
+    edge_label_index = data['gene','genemesh','mesh'].edge_label_index
+    data_loader = DataLoader(torch.arange(edge_label_index.size(0)), batch_size=batch_size)
+    for i, perm in enumerate(tqdm(data_loader, total=len(data_loader), desc='Predict', position=1, leave=True)):
+        g = h_dict['gene'][edge_label_index[0, perm]] 
+        m = h_dict['mesh'][edge_label_index[1, perm]]
+        # NOTE: concat here
+        inp = torch.cat([g, m], dim=1).to(device)
+        preds = model.link_predictor(inp).view(-1)
+        y_preds.append(preds.cpu())
+    y_preds = torch.cat(y_preds, dim=0) # note the difference with torch.stack()
+    y_preds = torch.sigmoid(y_preds).numpy()
+    return y_preds, h_dict
 
 
-
+## Trainining
+best_val_loss = np.Inf
 epoch_start = 0
 ckpts = os.path.join(args.outdir, f"gnn_{hidden_size}_best_model.pt")
 if os.path.exists(ckpts):
     tqdm.write(f"Loading checkpoints .... {datetime.now():%Y-%m-%d %H:%M:%S}")
     checkpoint = torch.load(ckpts)
     # load model weights state_dict
-    model.load_state_dict(checkpoint['model_state_dict'])
+    model.load_state_dict(checkpoint['state_dict'])
     tqdm.write('Previously trained model weights state_dict loaded...')
-    # load trained optimizer state_dict
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    tqdm.write('Previously trained optimizer state_dict loaded...')
     epoch_start = checkpoint['epoch']+1
+    #best_val_loss = checkpoint['val_loss']
     # load the criterion
     # criterion = checkpoint['loss']
     tqdm.write('Trained model loss function loaded...')
-## Trainining
-best_val_loss = np.Inf
+
 epoch_start= min(epoch_start, num_epochs)
 
 tqdm.write("Start training")
@@ -180,8 +202,10 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, position=0, 
     train_loss = train(epoch, device)
     # save every epoch
     torch.save({'state_dict': model.state_dict(),
-        'epoch': epoch, 'hidden_size': hidden_size, 'batch_size': batch_size}, 
-        os.path.join(args.outdir, f'gnn_{hidden_size}_epoch{epoch}.pt'))
+        'epoch': epoch, 
+        'hidden_size': hidden_size, 
+        'batch_size': batch_size}, 
+        os.path.join(args.outdir, f'gnn_{hidden_size}_epoch{epoch:03d}.pt'))
     # validation
     val_metrics = valid(epoch, device)  
     val_loss = val_metrics['val_loss']
@@ -190,16 +214,19 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, position=0, 
     acc = val_metrics['acc']
     tqdm.write(f'{datetime.now():%Y-%m-%d %H:%M:%S}  Epoch: {epoch:03d}, Train Loss: {train_loss:.7f}, Val Loss: {val_loss:.7f}, Val ROC: {auroc:.4f}, Val PR: {ap:.3f}, Val Acc: {acc:.7f}')
     # tensorboard
-    tb.add_scalar('Loss', {'train': train_loss, 'valid': val_loss}, epoch) 
-    tb.add_scalar('Valid', {'ap': ap, 'auroc': auroc, 'acc':acc}, epoch) 
+    tb.add_scalars('Loss', {'train': train_loss, 'valid': val_loss}, epoch) 
+    tb.add_scalars('Valid', {'ap': ap, 'auroc': auroc, 'acc':acc}, epoch) 
     tb.add_pr_curve("Precision-Recall", val_metrics['y'], val_metrics['y_preds'], epoch)
     # get best model
     if val_loss <= best_val_loss:
         best_val_loss = val_loss
         best_epoch = epoch
         torch.save({'state_dict': model.state_dict(),
-                    'epoch': epoch, 'hidden_size': hidden_size, 'batch_size': batch_size}, 
-                    os.path.join(args.outdir, 'gnn_{hidden_size}_best_model.pt'))
+                    'epoch': epoch, 
+                    'hidden_size': hidden_size, 
+                    'batch_size': batch_size,
+                    'val_loss': val_loss}, 
+                    os.path.join(args.outdir, f'gnn_{hidden_size}_best_model.pt'))
 # finish training
 tb.close()
 #
