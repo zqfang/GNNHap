@@ -149,7 +149,7 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, desc='Epoch'
     y = []
     y_preds = []
 
-    PATH = os.path.join(args.outdir, f'mlp_{hidden_size}_epoch{epoch:3d}.pt')
+    PATH = os.path.join(args.outdir, f'mlp_{hidden_size}_epoch{epoch:03d}.pt')
     torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
@@ -175,7 +175,7 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, desc='Epoch'
     if valid_loss < last_valid_loss:
         last_valid_loss = min(valid_loss, last_valid_loss)
         # Save checkpoint
-        PATH = os.path.join(args.outdir, 'mlp_{hidden_size}_best_model.pt')
+        PATH = os.path.join(args.outdir, f'mlp_{hidden_size}_best_model.pt')
         torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
