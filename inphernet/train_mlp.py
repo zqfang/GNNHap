@@ -23,19 +23,18 @@ torch.manual_seed(seed=123456)
 
 
 os.makedirs(args.outdir, exist_ok=True)
-tb = SummaryWriter(log_dir = os.path.join(args.outdir, "log/mlp"), filename_suffix=".MLP")
-
-
 # Parameters
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 input_size = 1900 + 768
 #input_size = args.input_size 
 hidden_size = args.hidden_size # 64
 num_epochs = args.num_epochs # 100
-batch_size = args.batch_size # 100000
+batch_size = args.batch_size # 50000
 learning_rate = args.lr # 0.01
 num_workers = args.num_cpus # 6
 
+# TB
+tb = SummaryWriter(log_dir = os.path.join(args.outdir, "log/mlp"), filename_suffix=f".MLP_{hidden_size}")
 # Load mesh embeddings
 print("Load embeddings")
 mesh_features = pd.read_csv(args.mesh_embed, index_col=0, header=None)
