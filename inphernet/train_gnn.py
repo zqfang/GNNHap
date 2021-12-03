@@ -13,6 +13,7 @@ import torch_geometric.transforms as T
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torch_geometric.data import HeteroData
+from torch_geometric import seed_everything
 from torchmetrics import AveragePrecision, Accuracy, AUROC
 from sklearn.metrics import average_precision_score, roc_auc_score, accuracy_score
 from data import GeneMeshData
@@ -26,7 +27,8 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 torch.set_num_threads(60)
 # argument parser
 args = add_train_args()
-torch.manual_seed(seed=123456)
+# torch.manual_seed(seed=123456)
+seed_everything(123456)
 
 os.makedirs(args.outdir, exist_ok=True)
 tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".GNN")
