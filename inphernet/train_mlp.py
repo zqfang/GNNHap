@@ -13,34 +13,35 @@ from data import GeneMeshData, GeneMeshMLPDataset
 from models import MLP
 
 from torch.utils.tensorboard import SummaryWriter
-from sklearn.metrics import average_precision_score, roc_auc_score, accuracy_score
+from sklearn.metrics import average_precision_score, roc_auc_score, accuracy_score, recall_score
 from utils import add_train_args
 from tqdm.auto import tqdm
 
 # argument parser
 args = add_train_args()
 torch.manual_seed(seed=123456)
-
-
 os.makedirs(args.outdir, exist_ok=True)
-tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".MLP", comment="basic_model")
-
-
 # Parameters
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 input_size = 1900 + 768
 #input_size = args.input_size 
-hidden_size = args.hidden_size # 1024
+hidden_size = args.hidden_size # 64
 num_epochs = args.num_epochs # 100
-batch_size = args.batch_size # 200000
+batch_size = args.batch_size # 50000
 learning_rate = args.lr # 0.01
 num_workers = args.num_cpus # 6
-
+one_hot = True
+# TB
+tb = SummaryWriter(log_dir = os.path.join(args.outdir, "log/mlp"), filename_suffix=f".MLP_{hidden_size}_onehot")
 # Load mesh embeddings
 print("Load embeddings")
-mesh_features = pd.read_csv(args.mesh_embed, index_col=0, header=None)
-gene_features = pd.read_csv(args.gene_embed, index_col=0, header=None)
-gene_features.index = gene_features.index.astype(str)
+if one_hot:
+    mesh_features = None
+    gene_features = None
+else:
+    mesh_features = None #pd.read_csv(args.mesh_embed, index_col=0, header=None)
+    gene_features = None #pd.read_csv(args.gene_embed, index_col=0, header=None)
+    gene_features.index = gene_features.index.astype(str)
 
 train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
 valid_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
@@ -52,21 +53,23 @@ valid_edge = torch.vstack([valid_data['gene','genemesh','mesh'].edge_label_index
                            valid_data['gene','genemesh','mesh'].edge_label]).T
 
 perm = torch.randperm(train_edge.shape[0])
-train_edge = train_edge[perm,:]
-
+train_edge = train_edge[perm,:].type(torch.LongTensor)
 ## No need to permute validation data, but it's fine
 perm = torch.randperm(valid_edge.shape[0])
-valid_edge = valid_edge[perm,:]
+valid_edge = valid_edge[perm,:].type(torch.LongTensor)
 
-train_data = GeneMeshMLPDataset(train_edge, gene_features, mesh_features, train_data['nid2gene'], train_data['nid2mesh'])
-valid_data = GeneMeshMLPDataset(valid_edge, gene_features, mesh_features, valid_data['nid2gene'], valid_data['nid2mesh'])
+## if use onehot
+if one_hot:
+    input_size = len(train_data['nid2gene']) + len(train_data['nid2mesh'])
+
+print("DataLoader")
+train_data = GeneMeshMLPDataset(train_edge, train_data['nid2gene'], train_data['nid2mesh'], gene_features, mesh_features)
+valid_data = GeneMeshMLPDataset(valid_edge, valid_data['nid2gene'], valid_data['nid2mesh'], gene_features, mesh_features)
 
 train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
 valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=batch_size, num_workers=num_workers)
 
-
-
-print("Build Model", file=sys.stderr)
+print("Build Model")
 model = MLP(input_size, hidden_size)
 model.to(device)
 print(model)
@@ -90,22 +93,24 @@ T_mult:这个控制了学习率回升的速度
 '''
 
 epoch_start = 0
-ckpts = os.path.join(args.outdir, "mlp_best_model.pt")
+weight = "mlp_{hidden_size}_best_model.pt"
+if one_hot: weight = "mlp_{hidden_size}_onehot_best_model.pt"
+ckpts = os.path.join(args.outdir, weight)
 if os.path.exists(ckpts):
-    print("Loading checkpoints...", datetime.now(), file=sys.stderr)
+    tqdm.write(f"Loading checkpoints .... {datetime.now():%Y-%m-%d %H:%M:%S}")
     checkpoint = torch.load(ckpts)
     # load model weights state_dict
     model.load_state_dict(checkpoint['model_state_dict'])
-    print('Previously trained model weights state_dict loaded...', file=sys.stderr)
+    tqdm.write('Previously trained model weights state_dict loaded...')
     # load trained optimizer state_dict
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    print('Previously trained optimizer state_dict loaded...', file=sys.stderr)
+    tqdm.write('Previously trained optimizer state_dict loaded...')
     epoch_start = checkpoint['epoch']+1
     # load the criterion
     # criterion = checkpoint['loss']
-    print('Trained model loss function loaded...', file=sys.stderr)
+    tqdm.write('Trained model loss function loaded...')
 
-print("Start training: ",  datetime.now(), file=sys.stderr)
+tqdm.write(f"Loading checkpoints .... {datetime.now():%Y-%m-%d %H:%M:%S}")
  
 epoch_start = min(epoch_start, num_epochs)
 last_valid_loss = np.Inf
@@ -149,6 +154,15 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, desc='Epoch'
     correct = 0
     y = []
     y_preds = []
+
+    PATH = os.path.join(args.outdir, f'mlp_{hidden_size}_epoch{epoch:03d}.pt')
+    torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': criterion,
+            }, PATH)
+
     tqdm.write(f"Validation epoch: {epoch}, time: {datetime.now()}")
     with torch.no_grad():
         for embeds in tqdm(valid_loader, total=len(valid_loader), desc='Train', position=1, leave=True):
@@ -167,7 +181,7 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, desc='Epoch'
     if valid_loss < last_valid_loss:
         last_valid_loss = min(valid_loss, last_valid_loss)
         # Save checkpoint
-        PATH = os.path.join(args.outdir, 'mlp_best_model.pt')
+        PATH = os.path.join(args.outdir, weight)
         torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
@@ -179,29 +193,15 @@ for epoch in tqdm(range(epoch_start, num_epochs), total=num_epochs, desc='Epoch'
     # other metric
     y_preds = np.concatenate(y_preds)
     y = np.concatenate(y)       
-    #fpr, tpr, thresholds = roc_curve(targets, y_pred, pos_label=1)
-    #precision, recall, pr_threshold = precision_recall_curve(targets, y_pred, pos_label=1)
     auc = roc_auc_score(y, y_preds)
     acc = accuracy_score(y > 0, y_preds > 0.5)
+    rs = recall_score(y > 0, y_preds > 0.5)
     apr = average_precision_score(y, y_preds)
-    tqdm.write('Validation: epoch %4d, accuracy %.2f, pr %.2f, auc %.2f ' % (epoch, acc, apr, auc))
+    tqdm.write(f'Validation: {datetime.now():%Y-%m-%d %H:%M:%S}, epoch {epoch:4d}, accuracy {acc:.2f}, pr {apr:.2f}, auc {auc:.2f}, recall {rs:.2f} ')
     tb.add_scalars('Loss', {'train':train_loss,
                              'valid':valid_loss}, epoch) 
-    tb.add_scalar('LearningRate', lr, epoch) 
-    tb.add_scalar('Valid/pr', apr, epoch) 
-    tb.add_scalar('Valid/roc', auc, epoch) 
+    tb.add_scalars('Valid',{'ap':apr, 'auc': auc,'recall': rs}, epoch) 
     tb.add_pr_curve("Precision-Recall", y, y_preds, epoch)
-
-    if epoch % 20 == 0:
-        # Save checkpoint
-        PATH = os.path.join(args.outdir, f'mlp_model_epoch{epoch}.pt')
-        torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss': criterion,
-                }, PATH)
-        tqdm.write(f"Save checkpoint to {PATH}")
 
 
 tb.add_graph(model, inputs)

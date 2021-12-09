@@ -15,7 +15,7 @@ from torch_geometric.utils import (negative_sampling, to_undirected, is_undirect
 import torch_geometric.transforms as T
 from torch_geometric.utils import (negative_sampling, to_undirected, is_undirected,
                                    add_remaining_self_loops, remove_isolated_nodes, remove_self_loops)
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Union, AnyStr
 
 class GeneMeshData:
     """
@@ -223,11 +223,11 @@ class GeneMeshData:
 
 class GeneMeshMLPDataset(Dataset):
     def __init__(self, edge_list, 
-                    gene_embed: pd.DataFrame, 
-                    mesh_embed: pd.DataFrame, 
                     idx2gene: Dict[int, str], 
                     idx2mesh: Dict[int, str], 
-                    transform= "concat",
+                    gene_embed: Union[pd.DataFrame, AnyStr] = None, 
+                    mesh_embed: Union[pd.DataFrame, AnyStr] = None, 
+                    transform: AnyStr= "concat",
                     test: bool = False):
         """
         Args:
@@ -241,25 +241,26 @@ class GeneMeshMLPDataset(Dataset):
         self._test = test
         self.transform = transform
         self.edge_list = edge_list.numpy()
-        self.gene_embed = gene_embed
-        self.mesh_embed = mesh_embed
-        if isinstance(gene_embed, str):
-            self.gene_embed = pd.read_csv(gene_embed, index_col=0, header=None)
-        
-        if isinstance(mesh_embed, str):
-            self.mesh_embed = pd.read_csv(mesh_embed, index_col=0)
         self.idx2gene = idx2gene
         self.idx2mesh = idx2mesh
- 
+        # attributes
+        if isinstance(gene_embed, str):
+            self.gene_embed = pd.read_csv(gene_embed, index_col=0, header=None)
+        elif isinstance(gene_embed, pd.DataFrame):
+            self.gene_embed = gene_embed
+        else:
+            self.gene_embed = torch.nn.functional.one_hot(torch.arange(0, len(idx2gene))).numpy()
+        if isinstance(mesh_embed, str):
+            self.mesh_embed = pd.read_csv(mesh_embed, index_col=0, header=None)
+        elif isinstance(mesh_embed, pd.DataFrame):
+            self.mesh_embed = mesh_embed
+        else:
+             self.mesh_embed = torch.nn.functional.one_hot(torch.arange(0, len(idx2mesh))).numpy()
+
     def __len__(self):
         return len(self.edge_list)
-    
-    def __getitem__(self, index):
-        if torch.is_tensor(index):
-            index = index.tolist()
-        if isinstance(index, int):
-            index = [index]
-        edges = self.edge_list[index,:]        
+
+    def _get_embed(self, edges):
         node1, node2 = [], []
         for i, data in enumerate(edges):
             n1, n2 = data[:2]
@@ -269,13 +270,37 @@ class GeneMeshMLPDataset(Dataset):
             node2.append(self.idx2mesh[n2])
         n1embed = self.gene_embed.loc[node1].values
         n2embed = self.mesh_embed.loc[node2].values
+        return n1embed, n2embed
+
+    def _get_onehot(self, edges):
+        node1, node2 = [], []
+        for i, data in enumerate(edges):
+            n1, n2 = data[:2]
+            n1 = int(n1)
+            n2 = int(n2)
+            node1.append(n1)
+            node2.append(n2)
+        n1embed = self.gene_embed[node1]
+        n2embed = self.mesh_embed[node2]
+        return n1embed, n2embed  
+
+    def __getitem__(self, index):
+        if torch.is_tensor(index):
+            index = index.tolist()
+        if isinstance(index, int):
+            index = [index]
+        edges = self.edge_list[index,:]        
+        if isinstance(self.gene_embed, pd.DataFrame):   
+            n1embed, n2embed = self._get_embed(edges)
+        else:
+            n1embed, n2embed = self._get_onehot(edges)
 
         if self.transform == 'concat':
             embed = np.hstack([n1embed, n2embed])
         elif self.transform == "add":
-            embed = node1 + node2
+            embed = n1embed + n2embed
         elif self.transform == 'hadamard':
-            embed = node1 * node2
+            embed = n1embed * n2embed
         #elif self.transform == 'distance':
         #    embed = torch.cdist(node1, node2, p=2)
         else:

@@ -24,14 +24,15 @@ from tqdm.auto import tqdm
 
 # device
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-torch.set_num_threads(60)
+#torch.manual_seed(seed=123456)
+seed_everything(123456)
 # argument parser
 args = add_train_args()
-# torch.manual_seed(seed=123456)
-seed_everything(123456)
-
+num_epochs = args.num_epochs
+hidden_size = args.hidden_size
+batch_size = args.batch_size # 10000
 os.makedirs(args.outdir, exist_ok=True)
-tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".GNN")
+tb = SummaryWriter(log_dir = args.outdir, filename_suffix=".GNN_{hidden_size}")
 # # # read data in
 # print("Load Gene Mesh Graph")
 # H = nx.read_gpickle(args.gene_mesh_graph) # note: H is undirected multigraph
@@ -65,9 +66,6 @@ train_data = joblib.load(os.path.join(args.outdir,"train.data.pkl"))
 val_data = joblib.load(os.path.join(args.outdir,"val.data.pkl"))
 ##test_datat = joblib.load(os.path.join(args.outdir,"test.data.pkl"))
 ## init model
-num_epochs = args.num_epochs
-hidden_size = args.hidden_size
-batch_size = args.batch_size # 10000
 model = HeteroGNN(heterodata=train_data, hidden_channels=hidden_size, num_layers=2)
 tqdm.write("Model")
 print(model)

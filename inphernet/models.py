@@ -93,27 +93,11 @@ class HeteroGNN(torch.nn.Module):
         x_dict = {key: self.lin[key](x) for key, x in x_dict.items()} 
         # Decoder 
         return x_dict
-
-    def distmult(self, x_dict, edge_label_index_dict):
-        s = x_dict['gene'][edge_label_index_dict[('gene','genemesh','mesh')][0]]
-        t = x_dict['mesh'][edge_label_index_dict[('gene','genemesh','mesh')][1]]
-        score = torch.sum(s * t, dim=1)
-        return score
-
-    def score_loss(self,  x_dict, edge_label_index_dict, edge_label_dict):
-        score = self.distmult(x_dict, edge_label_index_dict)
-        target = edge_label_dict[('gene','genemesh','mesh')]
-        #p = torch.sigmoid(score)
-        #loss = self.loss_fn(score, target))
-        return torch.nn.functional.binary_cross_entropy_with_logits(score, target)
-
-
-
     
 
 # model 2: multiPercepton
 class MLP(torch.nn.Module):
-    def __init__(self, input_size, hidden_size=1024):
+    def __init__(self, input_size, hidden_size=64):
         super(MLP,self).__init__()
         # number of hidden nodes in each layer (512)
         # input_size = 1900 + 768
@@ -123,11 +107,8 @@ class MLP(torch.nn.Module):
                                     torch.nn.BatchNorm1d(hidden_1),
                                     torch.nn.ReLU(),
                                     torch.nn.Linear(hidden_1, hidden_2),
-                                    torch.nn.ReLU(),
                                     torch.nn.BatchNorm1d(hidden_2),
                                     torch.nn.ReLU(),
-                                    torch.nn.Linear(hidden_2, hidden_2),
-                                    torch.nn.Dropout(0.2),
                                     torch.nn.Linear(hidden_2, 1)) 
     def forward(self,x):
         return self.mlp(x).view(-1) # squeeze last dim
