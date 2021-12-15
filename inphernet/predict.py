@@ -102,7 +102,8 @@ class HBCGM:
                   gm_data: HeteroData,
                   human_gene_nodes: Union[AnyStr, Dict], 
                   mouse_human_namedict: Union[AnyStr, Dict],
-                  expression_headers: Union[AnyStr, List]=None):
+                  mesh_nodes:Union[AnyStr, Dict],
+                  ):
 
         self.inputs = glob.glob(os.path.join(inputdir, "chr*results.txt"))
         self.mesh_terms = mesh_term_ids
@@ -110,7 +111,7 @@ class HBCGM:
                             'mesh2nid': {v:key for key, v in gm_data['nid2mesh'].items()}}
         self.gm_data = gm_data
         if not isinstance(human_gene_nodes, dict):
-            human_gene_nodes = joblib.load(os.path.join(BUNDLE_PATH,"human_gene_nodes.pkl"))
+            human_gene_nodes = joblib.load(human_gene_nodes)
         self.symbol2entrez = {}
         for entrez, value in human_gene_nodes.items():
             self.symbol2entrez[value['gene_symbol']] = entrez
@@ -120,40 +121,35 @@ class HBCGM:
         if not isinstance(mouse_human_namedict, dict):
             with open(mouse_human_namedict, 'r') as j:
                 self.mouse2human = json.load(j) ## Mouse gene name to human
+        self.mesh_nodes = mesh_nodes
+        if not isinstance(mesh_nodes, dict):
+            mesh_nodes = joblib.load(mesh_nodes)
         self.model = model
-        self.expr_header = expression_headers
-        if isinstance(expression_headers, str):
-            with open(expression_headers) as e:
-                self.expr_header = e.read().strip().split("\n")
+        self.headers = ""
         
-
     def save(self, output:AnyStr):
-        line = "MeSH_Terms_"
+        line = "##MeSH_Terms:"
         for mesh_term in self.mesh_terms:
-            m =  f"_{self.node2index['mesh2nid'][mesh_term]}:{mesh_term}"
+            mtd = self.mesh_nodes[mesh_term]['DescriptorName']
+            m =  f"\t| {mesh_term} -> {mtd} |"
             line += m
-        self.headers.append(line+"\n")
-       
+        self.headers[-1] = line+"\n"
+        if os.path.exists(output): os.remove(output)
+        self.result.drop(columns=['NodeIDX','logPval'], inplace=True)
         with open(output, 'a') as out:
             for line in self.headers:
-                out.write("##"+line)
-            ## Expression order
-            if self.expr_header is not None:
-                out.write("_".join(self.expr_header) + "\n")
+                out.write(line)
             ## Table
-            self.result.sort_values(['Pval','FDR','chr','blockStart']).to_csv(out, sep="\t", index=False)
+            self.result.sort_values(['Pvalue','FDR','Chr','BlockStart']).to_csv(out, sep="\t", index=False)
 
     def map2human(self, result):
-        case = pd.read_table(result, skiprows=3, header=None)
+        case = pd.read_table(result, skiprows=5)
         if case.shape[0] < 1: return case 
-        case.columns = ['GeneName','CodonFlag','Haplotype','Pval', 'EffectSize',  
-                        'FDR','popPval','popFDR',
-                        'chr','blockStart','blockEnd','Expression']
-        case.loc[case.index, 'HumanEntrezID'] = case.GeneName.map(self.mouse2human).map(self.symbol2entrez)
+        case.loc[case.index, 'HumanEntrezID'] = case['#GeneName'].map(self.mouse2human).map(self.symbol2entrez)
         case.loc[case.index, 'NodeIDX'] = case['HumanEntrezID'].map(self.node2index['gene2nid'])
         df = case.dropna(subset=['HumanEntrezID','NodeIDX'])
         df.loc[df.index, 'NodeIDX'] = df['NodeIDX'].astype(int)
-        df.loc[df.index, 'logPval'] = - np.log10(df.Pval)   
+        df.loc[df.index, 'logPval'] = - np.log10(df.Pvalue)   
         return df
     
 
@@ -165,7 +161,7 @@ class HBCGM:
                                       [self.node2index['mesh2nid'][mesh_term]]*df.NodeIDX.shape[0]])
             self.gm_data['gene', 'genemesh', 'mesh'].edge_label_index = edge_index
             prediction, node_embed = predict(self.model, self.gm_data, node_embed) # takes time to run #TODO: save node embed
-            MESH_SCORE = f"LiteratureScore_{mesh_term}"
+            MESH_SCORE = f"MeSH_{mesh_term}"
             df.loc[df.index, MESH_SCORE] = prediction
         return df
 
@@ -179,7 +175,7 @@ class HBCGM:
         with open(inp, 'r') as r:
             for i, line in enumerate(r):
                 self.headers.append(line)
-                if i >= 2: break 
+                if i >= 5: break 
         # concat results
         result = pd.concat(dfs)
         result = result.reset_index(drop=True)
@@ -196,7 +192,7 @@ hbcgm = HBCGM(inputdir=HBCGM_RESULTS,
               gm_data=gm_data,
               human_gene_nodes=human_gene_nodes,
               mouse_human_namedict=mouse_human_namedict,
-              expression_headers=mus_tissue_exp)
+              mesh_nodes = mesh_nodes)
 
 hbcgm.predict()
 OUTFILE = os.path.split(HBCGM_RESULTS)[-1] + ".results.txt"

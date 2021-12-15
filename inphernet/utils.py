@@ -127,7 +127,7 @@ def add_train_args():
     parser.add_argument("--mesh_embed", default=None, type=str, help="mesh_embedding file")
     parser.add_argument("--hidden_size", default=64, type=int, help="hidden size of GNN. Default 64")
     parser.add_argument("--lr", default=0.01, type=float, help="learning rate. Default 0.01")
-    parser.add_argument("--num_epochs", default=5, type=int, help="num_epochs for training. Default 5.")
+    parser.add_argument("--num_epochs", default=50, type=int, help="num_epochs for training. Default 5.")
     parser.add_argument("--batch_size", default=10000, type=int, help="batch size (num_edges) for mini-batch training and testing. Default 10000")
     parser.add_argument("--num_cpus", default=6, type=int, help="Number of cpus for dataloader, Default 6.")
     parser.add_argument("--outdir", type=str, required=False, default="checkpoints", help="Output file directory") 
