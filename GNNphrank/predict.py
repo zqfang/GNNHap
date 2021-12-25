@@ -133,10 +133,10 @@ class HBCGM:
         self.headers = ""
         
     def save(self, output:AnyStr):
-        line = "##MeSH_Terms:"
+        line = "##MeSH_Terms"
         for mesh_term in self.mesh_terms:
             mtd = self.mesh_nodes[mesh_term]['DescriptorName']
-            m =  f"\t| {mesh_term} -> {mtd} |"
+            m =  f"\t{mesh_term}:{mtd}"
             line += m
         self.headers[-1] = line+"\n"
         if os.path.exists(output): os.remove(output)
