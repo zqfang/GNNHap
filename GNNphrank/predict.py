@@ -144,7 +144,7 @@ class HBCGM:
         k = f"{entrzid}__{mesh}"
         if k in self.PUBMEDID:
             return ",".join(self.PUBMEDID[k])
-        return "Noval"
+        return "Indirect"
         
     def save(self, output:AnyStr):
         line = "##MeSH_Terms"
