@@ -51,6 +51,11 @@ python GNNHap/train_mlp.py --batch_size 10000 \
 
 see the [full guide](https://github.com/zqfang/haplomap) to get Haplomap (a.k.a HBCGM) results
 
+An snakemake pipeline in the `example` folder shows the full commands.
+
+```shell
+snakemake -s gnnhap.smk --configfile config.yaml -j 12 -p
+```
 
 ### 5. Predict
 
