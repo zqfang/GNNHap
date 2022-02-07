@@ -56,7 +56,17 @@ see the [full guide](https://github.com/zqfang/haplomap) to get Haplomap (a.k.a 
 
 Download the [GNNHap_Bundle](), which contained necessary files
 
-NOTE: the HBCGM output folder looks like this:
+**Case 1**: single result file
+```python
+python GNNHap/predict.py --bundle /path/to/GNNHap_Bundle  
+                  --hbcgm_result_dir ${RESULTS}# parent path to *results.txt
+                  --mesh_terms D018919,D009389,D043924,D003315 # separate each term with comma
+                  --num_cpus 12
+            
+```
+
+**Case 2**: multiple result files
+**NOTE 1**: the `${HBCGM_RESULT_DIR}`  folder looks like this:
 ``` 
 |-RESULTS
 |--- MPD_000.results.txt
@@ -64,13 +74,16 @@ NOTE: the HBCGM output folder looks like this:
 ...
 ```
 
+**NOTE 2**: provide a json file for `--mesh_terms` if multiple result file are predict
+
 ```python
 python GNNHap/predict.py --bundle /path/to/GNNHap_Bundle  
-                  --hbcgm_result_dir ${RESULTS}# path to *results.txt
-                  --mesh_terms D018919,D009389,D043924,D003315 # separate each term with comma
+                  --hbcgm_result_dir ${RESULTS}# parent path to *results.txt
+                  --mesh_terms mpd2mesh.json # separate each term with comma
                   --num_cpus 12
             
 ```
+
 ### 6. DataVisualization
 
 
