@@ -147,24 +147,25 @@ class HBCGM:
         return "Indirect"
         
     def save(self, output:AnyStr):
-        line = "##MeSH_Terms"
-        for mesh_term in self.mesh_terms:
-            if mesh_term not in self.mesh_nodes: continue
-            mtd = self.mesh_nodes[mesh_term]['DescriptorName']
-            m =  f"\t{mesh_term}:{mtd}"
-            c = f"PMIDs_{mesh_term}"
-            get_pmid = partial(self.get_pubmed_id, mesh=mesh_term)
-            self.result[c] = self.result['HumanEntrezID'].apply(get_pmid)
-            line += m
-        self.headers[-1] = line+"\n"
         if os.path.exists(output): os.remove(output)
+        line = "##MeSH_Terms"
         if not self.result.empty:
+            for mesh_term in self.mesh_terms:
+                if mesh_term not in self.mesh_nodes: continue
+                mtd = self.mesh_nodes[mesh_term]['DescriptorName']
+                m =  f"\t{mesh_term}:{mtd}"
+                c = f"PMIDs_{mesh_term}"
+                get_pmid = partial(self.get_pubmed_id, mesh=mesh_term)
+                self.result[c] = self.result['HumanEntrezID'].apply(get_pmid)
+                line += m
             self.result.drop(columns=['NodeIDX','logPval'], inplace=True)
             self.result.sort_values(['Pvalue','Chr'], inplace=True)
+        self.headers[-1] = line+"\n"
+
+        # write output
         with open(output, 'a') as out:
             for line in self.headers:
                 out.write(line)
-            ## Table
             self.result.to_csv(out, sep="\t", index=False)
 
     def map2human(self, result):
@@ -332,12 +333,12 @@ class HBCGM:
 ## START HBCGM predcition
 NODE_EMBED = None
 MESH_DICT = {}
-if MESH_TERMS is not None and MESH_TERMS.endswith("json"):
+if isinstance(MESH_TERMS, str) and MESH_TERMS.endswith("json"):
     with open(MESH_TERMS, 'r') as j:
         MESH_DICT = json.load(j) 
 # path = glob.glob(os.path.join(HBCGM_RESULTS, "*results.txt"))
-path = Path(HBCGM_RESULTS).glob("*results.txt")
-
+path = Path(HBCGM_RESULTS).glob("*.results.txt")
+print("Inference")
 hbcgm = HBCGM(inputdir=HBCGM_RESULTS, 
             mesh_term_ids=[],# ['D018919', 'D009389', 'D043924'], # MESH_TERMS
             model = model,
@@ -349,5 +350,11 @@ hbcgm = HBCGM(inputdir=HBCGM_RESULTS,
 for p in path:
     m = str(p).split("/")[-1].split(".")[0].split("_")[1] # mpd id
     m = m.split("-")[0] # strip suffix
-    hbcgm.predict_agg(str(p), mesh_terms=MESH_DICT[m])
+    # print(f"Inference MPD: {m}")
+    if os.path.exists(str(p).replace("txt","mesh.txt")): continue
+    if isinstance(MESH_TERMS, str) and MESH_TERMS.endswith("json"):
+        hbcgm.predict_agg(str(p), mesh_terms=MESH_DICT[m])
+    else:
+        hbcgm.predict_agg(str(p), mesh_terms=MESH_TERMS)
     hbcgm.save(str(p).replace("txt","mesh.txt"))
+print("DONE")
