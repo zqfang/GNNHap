@@ -17,7 +17,7 @@ Example result files could be found in the `example/PeltzData` folder.
 debug  
 ```shell
 ## --dev autoreload files 
-bokeh serve --show app --allow-websocket-origin=peltz-app-03:5006 --dev webapp/*.py --log-level=debug
+bokeh serve --show webapp --allow-websocket-origin=peltz-app-03:5006 --dev webapp/*.py --log-level=debug
 ```
 
 deployment  
