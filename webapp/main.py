@@ -1,4 +1,5 @@
 
+from genericpath import exists
 import os
 import numpy as np
 import pandas as pd
@@ -22,8 +23,11 @@ from .helpers import load_ghmap, get_color, get_expr, get_datasets, get_pubmed_l
 ## https://www.mousephenotype.org/help/non-programmatic-data-access
 ## https://www.mousephenotype.org/phenodcc/
 ######### global variable
-DATA_DIR = "/data/bases/shared/haplomap/MPD_MeSH_Indel" #"/data/bases/shared/haplomap/MPD_MeSH"
-#DATA_DIR = "/home/fangzq/github/HBCGM/example/PeltzData"
+#DATA_DIR = "/data/bases/shared/haplomap/MPD_MeSH_Indel" #"/data/bases/shared/haplomap/MPD_MeSH"
+DATA_DIR = "/home/fangzq/github/HBCGM/example/PeltzData"
+## change the file pattern if not default
+DATASETS = get_datasets(DATA_DIR)
+
 
 fcmap = factor_cmap('impact', palette=Category10[6], factors=['0','1','2','3','-1'])#['Synonymous','Non-Synonymous','Splicing', 'Stop', 'Non-Coding'])
 #fmark = factor_mark('impact', list(MarkerType), ['Synonymous','Non-Synonymous','Splicing', 'Stop', 'Non-Coding'])
@@ -36,7 +40,6 @@ source_bar = ColumnDataSource(data=dict(strains=[],traits=[], colors=[]))
 
 ### setup widgets
 # dataset id
-DATASETS = get_datasets(DATA_DIR)
 dataset = AutocompleteInput(completions=DATASETS, #value="MPD_26711-f_Indel",width=550,
                            title="Enter Dataset:", value=DATASETS[0], width=550,)
 # mesh terms options
@@ -140,26 +143,35 @@ def gene_update(attr, old, new):
         source_bar.data.update(colors=get_color(source.data["Pattern"][selected_index]))
         ep, ep2 = get_expr(source.data['GeneExprMap'][selected_index], gene_expr_order) 
         exprs.text = "<h3>Gene Expressed in:</h3>"+ep2
-        pid = "PMIDs_" + mesh_terms.get(meshid.value)
-        papers = str(source.data[pid][selected_index])
-        papers = get_pubmed_link(papers)
-        message.text = f"<h3>PubMedIDs:</h3><p>{papers}</p><h3>Gene Expression:</h3>{ep}" 
+        if meshid.value != "EffectSize":
+            pid = "PMIDs_" + mesh_terms.get(meshid.value)
+            papers = str(source.data[pid][selected_index])
+            papers = get_pubmed_link(papers)
+            message.text = f"<h3>PubMedIDs:</h3><p>{papers}</p><h3>Gene Expression:</h3>{ep}" 
         
     except IndexError:
         pass
     
 def mesh_update(attr, old, new):
     mesh = meshid.value
-    sca.title.text = mesh_terms.get(mesh) + " : " + mesh
-    mesh1 = "MeSH_" + mesh_terms.get(mesh)
-    pubmed = "PMIDs_" + mesh_terms.get(mesh)
-    mesh_columns = [m for m in source.data.keys() if m.startswith("MeSH") ]
-    if mesh1 not in mesh_columns:
-        mesh1 = mesh_columns[0]
-        message.text = f"<p>Sorry, input MeSH not found! <br> Selected: {mesh1} </p>"
-        return
-    source.data.update(LitScore=source.data[mesh1]) # datatable
-    source.data.update(PubMed=list(map(get_pubmed_link,source.data[pubmed])))
+    if mesh == "EffectSize":
+        sca.title.text = mesh 
+        source.data.update(LitScore=source.data[mesh]) # datatable
+        sca.yaxis.axis_label = "Effect Size" #"MeSH"
+    else:
+        sca.title.text = mesh_terms.get(mesh) + " : " + mesh
+        mesh1 = "MeSH_" + mesh_terms.get(mesh)
+        pubmed = "PMIDs_" + mesh_terms.get(mesh)
+        mesh_columns = [m for m in source.data.keys() if m.startswith("MeSH") ]
+        if len(mesh_columns) < 1:
+            return
+        if mesh1 not in mesh_columns:
+            mesh1 = mesh_columns[0]
+            message.text = f"<p>Sorry, input MeSH not found! <br> Selected: {mesh1} </p>"
+            return
+        source.data.update(LitScore=source.data[mesh1]) # datatable
+        source.data.update(PubMed=list(map(get_pubmed_link,source.data[pubmed])))
+        sca.yaxis.axis_label = "Literature Score" #"MeSH"
     #myTable.source.data.update(LitScore=source.data[mesh]) # datatable
     
      
@@ -169,8 +181,12 @@ def data_update(attr, old, new):
     global codon_flag
 
     ds = dataset.value
-    DATASET = os.path.join(DATA_DIR, '%s.results.mesh.txt' % ds)
-    if not os.path.exists(DATASET):
+    DATASET = os.path.join(DATA_DIR, f'{ds}.results.mesh.txt')
+    if os.path.exists(DATASET):
+        pass
+    elif os.path.exists(os.path.join(DATA_DIR, f'{ds}.results.txt')):
+        DATASET = os.path.join(DATA_DIR, f'{ds}.results.txt')
+    else:
         message.text = f"<p> Error: <br> Dataset {ds} not found <br> Please Input a new dataset name.</p>"
         return
     # update new data
@@ -182,30 +198,34 @@ def data_update(attr, old, new):
 
     if df.columns.str.startswith("Pop").sum() == 0: 
         # kick out 'FDR', PopPvalue', 'PopFDR',
-        myTable.columns = [ columns[i] for i in range(len(columns)) if  i not in [5, 6,7] ]   
+        _columns = [ columns[i] for i in range(len(columns)) if  i not in [5, 6, 7] ]   
     else:
-        myTable.columns = columns
-
+        _columns = columns
     # update mesh, bar, scatter
     mesh_columns = [m for m in df.columns if m.startswith("MeSH_") ]
     if len(mesh_columns) == 0:
-        message.text = f"<p> Error: <br> Dataset {ds} not load Mesh Score !!! <br> Please Input a new dataset name.</p>"
-        return    
+        message.text = f"<p> Warning: <br> Dataset {ds} not load Mesh Score !</p>"
+        #_columns.pop(_columns.index("PubMed")) # kick out PubMed
+        #_columns.pop(_columns.index('LitScore'))
+        _columns.pop(-1)
+        _columns.pop(-1)
+
+    myTable.columns = _columns    
     dataset_name, codon_flag, gene_expr_order, strains, traits, mesh_terms = headers[:6]
     # if (dataset_name[0].lower().find("indel") != -1) or (dataset_name[0].lower().find("_sv") != -1):
     #     codon_flag = {'0':'Low','1':'Moderate','2':'High', '-1':'Modifier'}
     x_range = list(range(0, len(strains)))
+    if not mesh_terms: #  if empty 
+        mesh_terms = {'EffectSize':'EffectSize'}
     # updates
     message.text = f"<p> Loaded dataset {ds}</p>"
     meshid.value = list(mesh_terms.keys())[0]
     meshid.options = list(mesh_terms.keys())
     impact.options = list(codon_flag.values())
-
     source.data = df
     mesh_update(None, None, None)
     impact_update(None, None, None)
     impact.value = list(codon_flag.values())[0]
-    #source.data.update(LitScore=df.loc[:, mesh_columns[0]].to_list())
     # need to reset filters again
     myTable.disabled = True 
     view.filters = [BooleanFilter(), GroupFilter()]
@@ -216,7 +236,8 @@ def data_update(attr, old, new):
     bar.xaxis.ticker = FixedTicker(ticks=x_range)
     bar.xaxis.major_label_overrides = {k: str(v) for k, v in zip(x_range, strains)}
     bar.title.text = "Dataset: "+dataset_name[0]
-    sca.title.text = mesh_columns[0].split("_")[-1] + ": "+ list(mesh_terms.keys())[0]
+    if len(mesh_columns) > 0:
+        sca.title.text = mesh_columns[0].split("_")[-1] + ": "+ list(mesh_terms.keys())[0]
     # slider_update(attr, old, new)
 
 def slider_update(attr, old, new):
@@ -263,4 +284,4 @@ layout = column(inputs, o)
     
 # source.selected.on_change('indices', function_source)
 curdoc().add_root(layout)
-curdoc().title = "HBCGM Dashboard"
+curdoc().title = "GNNHap Dashboard"

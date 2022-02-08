@@ -55,17 +55,16 @@ def get_html_string(pattern):
         html_string += s     
     return html_string
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=5)
 def load_ghmap(dataset):
     fname = os.path.join(dataset)
-    df = pd.read_table(fname, skiprows=6, dtype={'Haplotype': str, 'Chr': str})
     headers = []
     with open(fname, 'r') as d:
         for i, line in enumerate(d):
-            headers.append(line.strip("\n#").split("\t"))
+            if line.startswith("#"):
+                headers.append(line.strip("\n#").split("\t"))
             if i == 6: break
-            
-    df.columns = headers[-1]
+    df = pd.read_table(fname, comment="#", header=None, names =headers[-1],  dtype={'Haplotype': str, 'Chr': str})
     df['Pattern'] = df['Haplotype'].astype(str)
     df['Haplotype'] = df.Haplotype.apply(get_html_string)
     df['GeneName'] = df.GeneName.apply(get_html_links)
@@ -75,10 +74,12 @@ def load_ghmap(dataset):
  
     cf = [s.split(":") for s in headers[1][1:]]
     headers[1] = {k:v for k, v in cf}
-
-    mesh_terms = [s.split(":") for s in headers[5][1:]]
-    mesh_terms = {v:k for k, v in mesh_terms}
-    headers[5] = mesh_terms
+    if len(headers) == 7: # dataset with MeSH_Terms
+        mesh_terms = [s.split(":") for s in headers[5][1:]]
+        mesh_terms = {v:k for k, v in mesh_terms}
+        headers[5] = mesh_terms
+    else:
+        headers.insert(5, dict())
 
     df['Impact'] = df['CodonFlag'].astype(str).map(headers[1])
     df['logPvalue'] = -np.log10(df['Pvalue'])
@@ -117,8 +118,8 @@ def get_expr(pattern, gene_expr_order):
 
 def get_datasets(data_dir):
     data = []
-    path = Path(data_dir).glob("*.results.mesh.txt")
+    path = list(Path(data_dir).glob("*.results.mesh.txt")) + list(Path(data_dir).glob("*.results.txt"))
     for p in path:
         d = p.stem.split(".")[0]
         data.append(d)
-    return sorted(data)
+    return sorted(list(set(data)))
