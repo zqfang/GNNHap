@@ -319,17 +319,6 @@ class HBCGM:
 #                   --hbcgm_result_dir /data/bases/fangzq/Pubmed/test_cases/TEST/RUN_000
 
 
-# MESH_DICT = {'10806':'D003337',
-#  '10807':'D020712',
-#  '10813':'D020712',
-#  '26721': 'D017948',
-#  '50243':'D002331',
-#  '9904': 'D008076',
-#  'Haloperidol': "D064420",
-#  'irinotecan': 'D000077146',
-#  'Cocaine':'D007858',
-# }
-
 ## START HBCGM predcition
 NODE_EMBED = None
 MESH_DICT = {}
