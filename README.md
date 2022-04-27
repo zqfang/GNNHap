@@ -19,15 +19,20 @@ Graph Neural Network based Haplotype Prioritization for inbred mouse.
     ```
 
 ## Workflow
-### 1. Download files
+### Use pretrain network to predict gene-phenotype association
+
+see step 5.
+
+### Train you own model
+#### 1. Download files
 see Download.md
-### 2. Build Knowlege graph
+#### 2. Build Knowlege graph
 ```shell
 snakemake -s graph/pubmed_graph_parallel.smk -p -j 32
 ```
 This step generate the graph file: human_gene_mesh_hetero_nx.gpkl
 
-### 3. Train your GNN and LinkPredictor
+#### 3. Train your GNN and LinkPredictor
 ```shell
 # GNN encoder + Linkpredictor
 ## hidden_size 50 fits to a 24G GPU card
@@ -47,7 +52,7 @@ python GNNHap/train_mlp.py --batch_size 10000 \
                     --gene_mesh_graph ${WKDIR}/human_gene_mesh_hetero_nx.gpkl
 ```
 
-### 4. Genetic mapping using Haplomap
+#### 4. Genetic mapping using Haplomap
 
 see the [full guide](https://github.com/zqfang/haplomap) to get Haplomap (a.k.a HBCGM) results
 
@@ -57,9 +62,9 @@ An snakemake pipeline in the `example` folder shows the full commands.
 snakemake -s gnnhap.smk --configfile config.yaml -j 12 -p
 ```
 
-### 5. Predict
+#### 5. Predict
 
-Download the [GNNHap_Bundle](), which contained necessary files
+Download the [GNNHap_Bundle](https://doi.org/10.5281/zenodo.6463988), which contained necessary files
 
 **Case 1**: single result file
 ```python
@@ -89,7 +94,7 @@ python GNNHap/predict.py --bundle /path/to/GNNHap_Bundle
             
 ```
 
-### 6. DataVisualization
+#### 6. DataVisualization
 
 
 set the `DATA_DIR` to your GNNHap output folder in the `main.py`, then run the following command:
