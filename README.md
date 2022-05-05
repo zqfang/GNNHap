@@ -18,19 +18,21 @@ Graph Neural Network based Haplotype Prioritization for inbred mouse.
     pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.3.0/en_ner_bionlp13cg_md-0.3.0.tar.gz
     ```
 
+
 ## Build Graph and Train Model
 
-if you would like to use pretrain model, go to prediction step
+if you would like to use our pretrain model, go to the prediction step
 
-### 1. Download files
+#### 1. Download files
+
 see Download.md
-### 2. Build Knowlege graph
+#### 2. Build Knowlege graph
 ```shell
 snakemake -s graph/pubmed_graph_parallel.smk -p -j 32
 ```
 This step generate the graph file: human_gene_mesh_hetero_nx.gpkl
 
-### 3. Train your GNN and LinkPredictor
+#### 3. Train your GNN and LinkPredictor
 ```shell
 # GNN encoder + Linkpredictor
 ## hidden_size 50 fits to a 24G GPU card
@@ -121,7 +123,7 @@ python GNNHap/predict.py --bundle /path/to/GNNHap_Bundle  \
             
 ```
 
-### 6. DataVisualization
+## DataVisualization
 
 
 set the `DATA_DIR` to your GNNHap output folder in the `main.py`, then run the following command:
