@@ -59,7 +59,7 @@ python GNNHap/train_mlp.py --batch_size 10000 \
 #### 1. Simple usage
 input only need a text file with at least two columns (gene_symbol, MeSH_ID)
 
-example (first two column are required):
+example.txt (first two column are required):
 ```
 GeneName        MeSH    p_val   avg_log2FC      pct.1   pct.2   p_val_adj
 ITGA1   D007694 5.15054414391506e-228   2.01032118407705        1       0.108   1.2017764650997e-223
@@ -71,10 +71,10 @@ LGALS3  D007694 8.92764452941871e-123   1.6742751831308 0.818   0.182   2.083087
 ```
 run prediction
 ```shell
-python /home/fangzq/github/GNNHap/GNNHap/predict_simple.py 
-            --bundle /data/bases/fangzq/Pubmed/bundle 
-            --input strain.uniq.high.to.MeSH.D034381.txt 
-            --output strain.uniq.high.to.MeSH.D034381.gnnhap.txt
+python GNNHap/predict_simple.py 
+            --bundle /path/to/GNNHap_Bundle 
+            --input example.txt 
+            --output example.gnn.txt
             --species human # or mouse
 ```
 
