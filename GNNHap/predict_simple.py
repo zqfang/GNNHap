@@ -23,6 +23,7 @@ def add_train_args():
     parser.add_argument("--input", type=str, required=True, help="Output file name") 
     parser.add_argument("--output", type=str, required=True, help="Output file name") 
     parser.add_argument("--bundle", default=None, type=str, help="Path to the directory name of the required files (for predition task)")
+    parser.add_argument("--species", default='human', type=str, choices=('human','mouse'), help="the orangism for input gene names. choice from {human, mouse} ")
     parser.add_argument("--gene_mesh_graph", type=str, default=None, help="genemesh.data.pkl object or genemesh.gpkl object")
     parser.add_argument("--gene_embed", default=None, type=str, help="gene_embedding file")
     parser.add_argument("--mesh_embed", default=None, type=str, help="mesh_embedding file")
@@ -50,7 +51,10 @@ HBCGM_RESULTS = args.input
 
 model_weight = os.path.join(BUNDLE_PATH, "gnn_64_epoch0.pt")
 genemesh_data = os.path.join(BUNDLE_PATH, "genemesh.data.pkl") # genemesh.data.pkl
-mouse_human_namedict = os.path.join(BUNDLE_PATH, "mouse2human.genenames.json")
+
+mouse_human_namedict = None
+if args.species == 'mouse':
+    mouse_human_namedict = os.path.join(BUNDLE_PATH, "mouse2human.genenames.json")
 
 if not os.path.exists(model_weight):
     raise LookupError("model weights not found")
@@ -120,9 +124,9 @@ class Simple:
                   model: torch.nn.Module,
                   gm_data: HeteroData,
                   human_gene_nodes: Union[AnyStr, Dict], 
-                  mouse_human_namedict: Union[AnyStr, Dict],
                   mesh_nodes:Union[AnyStr, Dict],
-                  pubmed_ids: Union[AnyStr, Dict]
+                  pubmed_ids: Union[AnyStr, Dict],
+                  mouse_human_namedict: Union[AnyStr, Dict] = None,
                   ):
 
         self.inputs = pd.read_table(input)
@@ -136,10 +140,11 @@ class Simple:
             self.symbol2entrez[value['gene_symbol']] = entrez
 
         # load 
-        self.mouse2human = mouse_human_namedict
-        if not isinstance(mouse_human_namedict, dict):
+        self.mouse2human = mouse_human_namedict # if none, means human gene list input, if dict, skip
+        if isinstance(mouse_human_namedict, str):
             with open(mouse_human_namedict, 'r') as j:
                 self.mouse2human = json.load(j) ## Mouse gene name to human
+
         self.mesh_nodes = mesh_nodes
         if not isinstance(mesh_nodes, dict):
             mesh_nodes = joblib.load(mesh_nodes)
@@ -152,7 +157,7 @@ class Simple:
     
     def get_pubmed_id(self, row):  
         entrzid = row['HumanEntrezID']
-        mesh = row['MeSH']
+        mesh = row[self._columns[1]]
         k = f"{entrzid}__{mesh}"
         if k in self.PUBMEDID:
             return ",".join(self.PUBMEDID[k])
@@ -162,7 +167,8 @@ class Simple:
         #mtd = self.mesh_nodes[mesh_term]['DescriptorName']
         self.result.loc[self.result.index, 'MeSH_Terms'] = self.result['MeSH'].apply(lambda m: self.mesh_nodes[m]['DescriptorName'])
         self.result.loc[self.result.index, 'PubMedID'] = self.result.apply(self.get_pubmed_id, axis=1)
-        self.result.loc[:,['#GeneName','MeSH','MeSH_Terms','MGI','HumanEntrezID','LiteratureScore','PubMedID']].to_csv(output, sep="\t", index=False)
+        outcols = self._columns + ['HumanEntrezID','MeSH_Terms','LiteratureScore','PubMedID']
+        self.result.loc[:, outcols].to_csv(output, sep="\t", index=False)
 
     def map2human(self, result):
         if isinstance(result, pd.DataFrame):
@@ -173,10 +179,17 @@ class Simple:
 
         if case.shape[0] < 1: 
             print(f"input data is empty: {result}")
-            return case 
-        case.loc[case.index, 'HumanEntrezID'] = case['#GeneName'].map(self.mouse2human).map(self.symbol2entrez)
+            return case
+        self._columns = list(case.columns) 
+        assert len(self._columns) >=2, "at least two columns input needed <GeneName, MeSH>"
+        g, m = self._columns[:2] # first two column, gene, mesh
+
+        if self.mouse2human is None:
+            case.loc[case.index, 'HumanEntrezID'] = case[g].map(self.symbol2entrez)
+        else: 
+            case.loc[case.index, 'HumanEntrezID'] = case[g].map(self.mouse2human).map(self.symbol2entrez)
         case.loc[case.index, 'GNodeIDX'] = case['HumanEntrezID'].map(self.node2index['gene2nid'])
-        case.loc[case.index, 'MNodeIDX'] = case['MeSH'].map(self.node2index['mesh2nid'])
+        case.loc[case.index, 'MNodeIDX'] = case[m].map(self.node2index['mesh2nid'])
         df = case.dropna(subset=['HumanEntrezID','GNodeIDX'])
         df.loc[df.index, 'GNodeIDX'] = df['GNodeIDX'].astype(int)
         df.loc[df.index, 'MNodeIDX'] = df['MNodeIDX'].astype(int)
@@ -205,9 +218,9 @@ hbcgm = Simple(input=HBCGM_RESULTS,
             model = model,
             gm_data=gm_data,
             human_gene_nodes=human_gene_nodes,
-            mouse_human_namedict=mouse_human_namedict,
             mesh_nodes = mesh_nodes,
-            pubmed_ids=pubmed_json)
+            pubmed_ids=pubmed_json,
+            mouse_human_namedict=mouse_human_namedict,)
 
 hbcgm.predict()
 hbcgm.save(args.output)
