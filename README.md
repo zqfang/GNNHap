@@ -56,7 +56,11 @@ python GNNHap/train_mlp.py --batch_size 10000 \
 
 ## Prediction
 
-#### 1. Simple usage
+Download the [GNNHap_Bundle](https://doi.org/10.5281/zenodo.6463988), which contained necessary files 
+
+Replace the graph, and your own trained model if needed.
+
+#### 1. Simple usage case
 input only need a text file with at least two columns (gene_symbol, MeSH_ID)
 
 example.txt (first two column are required):
@@ -89,9 +93,7 @@ An snakemake pipeline in the `example` folder shows the full commands.
 snakemake -s gnnhap.smk --configfile config.yaml -j 12 -p
 ```
 
-Predict
-
-Download the [GNNHap_Bundle](https://doi.org/10.5281/zenodo.6463988), which contained necessary files
+For HBCGM results,
 
 **Case 1**: single result file
 ```python
@@ -112,12 +114,13 @@ python GNNHap/predict.py --bundle /path/to/GNNHap_Bundle  \
 ...
 ```
 
-**NOTE 2**: provide a json file for `--mesh_terms` if multiple result file are predict
+**NOTE 2**: provide a json file for `--mesh_terms` if multiple result file are predicted.
+the json file records the each files's MeSH term IDs.
 
 ```python
 python GNNHap/predict.py --bundle /path/to/GNNHap_Bundle  \
                   --hbcgm_result_dir ${RESULTS} \ # parent path to *results.txt
-                  --mesh_terms mpd2mesh.json  \ # separate each term with comma
+                  --mesh_terms mpd2mesh.json  \
                   --species mouse
                   --num_cpus 12
             
