@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+<title>GNNHap Data Visualization</title>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"> </script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.1/jquery-ui.min.js"></script>
+  <!-- <script src="https://cdn.bokeh.org/bokeh/release/bokeh-mathjax-2.4.2.min.js" crossorigin="anonymous"></script> -->
+  <script src="https://cdn.bokeh.org/bokeh/release/bokeh-2.4.2.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-2.4.2.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-2.4.2.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.bokeh.org/bokeh/release/bokeh-gl-2.4.2.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.bokeh.org/bokeh/release/bokeh-mathjax-2.4.2.min.js" crossorigin="anonymous"></script>
+  <!-- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"> -->
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <!-- Custom Style -->
+  <link href="{{ url_for('static',filename='css/custom.min.css') }}" rel="stylesheet">
+  <!-- <link href="static/css/custom.min.css" rel="stylesheet"> -->
+  {{ js_resources|safe }}
+  {{ css_resources|safe }}
+  {{ plot_script|safe }}
+</head>
+
+<body>
+  <nav>
+    <a class="navbar" href="{{ url_for('index') }}">Home</a>
+    <a class="navbar" href="{{ url_for('results') }}">Results</a>
+    <a class="navbar" href="#">About</a>
+  </nav>
+  <div class="content">
+    <h1>Welcome to GNNHap Data Visualization Server </h1>
+    <p>GNNHap is an AI-driven genetic discovery program for Inbred mice. </p>
+    <h2> Usage </h2>
+    <ol> 
+      <li>Input a new dataset name in the TextInputBox to update everything in this page</li>
+      <li>Select MeSH term to get literature score</li>
+      <li>Click DataTable row to highlight a gene</li>
+      <li>Click DataTable header to sort a column. Clicking one more time changes sort direction. <br>
+        Use Shift + click to sort multiple columns simultaneously. <br>
+        Use Ctrl + click to return to natural order.</li>
+      <li>Save DataTable by click download button.</li>
+      <li>Save Figures by click save widget below the plots.</li>
+    </ol> 
+
+    <h2> Results </h2>
+    <div>{{ plot_div|safe }}</div>
+
+
+
+  </div>
+</body>
+</html>

@@ -28,6 +28,12 @@ mesh_terms = {}
 with open("/data/bases/fangzq/Pubmed/mouse_gene2entrezid.json", 'r') as j:
     GENE2ENTREZ = json.load(j) 
 
+# ALLOWED_EXTENSIONS = {'txt', 'csv', 'xlsx', 'xls'}
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in {'txt', 'csv', 'xlsx', 'xls'}
+
+
 def get_pubmed_link(pmids):
     if pmids in ["Indirect", "Unknown_Gene"]:
         return pmids
@@ -57,6 +63,7 @@ def get_html_string(pattern):
 
 @lru_cache(maxsize=5)
 def load_ghmap(dataset):
+    print(dataset)
     fname = os.path.join(dataset)
     headers = []
     with open(fname, 'r') as d:
@@ -87,8 +94,12 @@ def load_ghmap(dataset):
     df['logPvalue'].fillna(df['logPvalue'].max(), inplace=True)
     df['CodonColor'] = df['CodonFlag'].astype(str).map(codon_color_dict)
      
-    #mesh_columns = [m for m in headers[-1] if m.startswith("MeSH") ]
-    
+    mesh_columns = [m for m in headers[-1] if m.startswith("MeSH") ]
+    mx = mesh_columns[0] if len(mesh_columns) > 0 else "EffectSize"    
+    df['LitScore'] = df[mx]
+
+    #pmid_columns = [ p for p in headers[-1] if p.startswith("PMIDs_")]
+
     return df, headers 
 
 
@@ -118,8 +129,51 @@ def get_expr(pattern, gene_expr_order):
 
 def get_datasets(data_dir):
     data = []
-    path = list(Path(data_dir).glob("*.results.mesh.txt")) + list(Path(data_dir).glob("*.results.txt"))
-    for p in path:
-        d = p.stem.split(".")[0]
-        data.append(d)
-    return sorted(list(set(data)))
+    path = list(Path(data_dir).glob("**/*.results.mesh.txt")) #+ list(Path(data_dir).glob("**/*.results.txt"))
+    return sorted([str(p).split("/")[-1] for p in path])
+    # for p in path:
+    #     d = p.stem.split(".")[0]
+    #     data.append(d)
+    # return sorted(list(set(data)))
+
+
+def load_dat(uid):
+    global gene_expr_order
+    global mesh_terms
+    global codon_flag
+    ## 
+    DATASET = os.path.join(app.config['HBCGM_DIR'], f'{uid}.results.mesh.txt')
+
+    df, headers = load_ghmap(DATASET)
+    df = df[df.CodonFlag>=0]
+    if df.empty:
+        print("No significant values loaded")
+        return  
+    columns = ['GeneName', 'CodonFlag','Haplotype','EffectSize', 'Pvalue', 'FDR',
+                'PopPvalue', 'PopFDR', 'Chr', 'ChrStart', 'ChrEnd', 'LitScore','PubMed'] 
+    if df.columns.str.startswith("Pop").sum() == 0: 
+        # kick out 'FDR', PopPvalue', 'PopFDR',
+        _columns = [ columns[i] for i in range(len(columns)) if  i not in [5, 6, 7] ]   
+    else:
+        _columns = columns
+    # update mesh, bar, scatter
+    mesh_columns = [m for m in df.columns if m.startswith("MeSH_") ]
+    if len(mesh_columns) == 0:
+        message = f"<p> Warning: <br> Dataset {uid} not load Mesh Score !</p>"
+        #_columns.pop(_columns.index("PubMed")) # kick out PubMed
+        #_columns.pop(_columns.index('LitScore'))
+        _columns.pop(-1)
+        _columns.pop(-1)
+
+    # self.myTable.columns = _columns    
+    dataset_name, codon_flag, gene_expr_order, strains, traits, mesh_terms = headers[:6]
+    # if (dataset_name[0].lower().find("indel") != -1) or (dataset_name[0].lower().find("_sv") != -1):
+    #     codon_flag = {'0':'Low','1':'Moderate','2':'High', '-1':'Modifier'}
+    x_range = list(range(0, len(strains)))
+    if not mesh_terms: #  if empty 
+        mesh_terms = {'EffectSize':'EffectSize'}
+
+    new_data = {'dataset_name': dataset_name, 'codon_flag': codon_flag, 'gene_expr_order': gene_expr_order,
+                'strains': strains, 'traits': traits, 'mesh_terms': mesh_terms,  'columns': _columns, 'mesh_columns':'mesh_columns',
+                'datasource': df.to_dict(orient='list'),}
+    return new_data

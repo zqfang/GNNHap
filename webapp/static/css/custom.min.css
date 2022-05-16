@@ -3,18 +3,20 @@ html {
 }
 body {
     min-width: 600px;
-    max-width: 1000px;
+    max-width: 1800px;
     /* width: 75%; */
     /* margin: auto; */
     /* margin: 5%; */
     /* padding:5%; */
     margin-top:0;
-    margin-left:5%;
+    margin-left:10%;
 }
-.content {
-    margin: 0em;
-    font-family: 'Julius Sans One', sans-serif;
+
+label {
+    width:300px;
+    display: inline-block;
 }
+
 h1 {
     margin: 2em 0 0 0;
     color: #2e484c;
@@ -46,10 +48,64 @@ a:hover, a:focus, a:active {
 }
 p {
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-size: 1.2em;
+    font-size: 1.0em;
     text-align: justify;
     text-justify: inter-word;
 }
+table {
+    width: 50%;
+  }
+
+th {
+    padding: 10px;
+    text-align: left;
+    background-color: #04AA6D;
+    color: white;
+  }
+
+td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+
+tr:nth-child(even) {background-color: #f2f2f2;}
+tr:hover {background-color: coral;}
+
+.content {
+    margin: 0em;
+    font-family: 'Julius Sans One', sans-serif;
+    /* width: 100%; */
+}
+
+.navbar
+{
+    font-size: 1.2em;
+}
+
+.horizontal{
+    float: left;
+    // border: 1px solid green
+}
+
+.horizontal  > *{
+    vertical-align: top;
+    display: inline-block;
+    margin-left: 10px;
+}
+
+.vertical {
+    float: left;
+    width: 100%;
+    border: 1px solid blue
+}
+
+.vertical  > *{
+    display :block;
+    width: 100%;
+}
+
+
 .videoWrapper {
     margin-top: 30px;
     position: relative;
@@ -70,3 +126,4 @@ p {
     text-align: center;
     padding: 10px;
   }
+

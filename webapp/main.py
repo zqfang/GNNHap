@@ -25,7 +25,7 @@ from .helpers import load_ghmap, get_color, get_expr, get_datasets, get_pubmed_l
 ######### global variable
 #DATA_DIR = "/data/bases/shared/haplomap/MPD_MeSH_Indel" #"/data/bases/shared/haplomap/MPD_MeSH"
 DATA_DIR = "/home/fangzq/github/HBCGM/example/PeltzData"
-## change the file pattern if not default
+# ## change the file pattern if not default
 DATASETS = get_datasets(DATA_DIR)
 
 
@@ -281,7 +281,5 @@ o = row(figs2, robj4)
 layout = column(inputs, o)
 
 
-    
-# source.selected.on_change('indices', function_source)
 curdoc().add_root(layout)
 curdoc().title = "GNNHap Dashboard"

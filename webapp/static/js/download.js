@@ -3,8 +3,8 @@ function table_to_csv(source) {
     var columns = source.columns() //
     const nrows = source.get_length()
     // const lines = [columns.join(',')]
-    const ignore = ["LitScore", "CodonColor", "index","logPvalue","PubMed"]
-    const lines = [columns.filter(function(str){return ignore.indexOf(str) < 0;}).join(',')]
+    const ignore = ["LitScore", "CodonColor", "index","logPvalue","PubMed","Haplotype"]
+    const lines = [columns.filter(function(str){return ignore.indexOf(str) < 0;}).join('\t')]
     for (let i = 0; i < nrows; i++) {
         let row = [];
         for (let j = 0; j < columns.length; j++) {
@@ -13,15 +13,29 @@ function table_to_csv(source) {
             {
                 continue
             }
+
+            if (column == "GeneName")
+            {
+                const s = source.data["GeneName"][i].toString();
+                const start = s.indexOf(">");
+                const end = s.indexOf("</");
+                row.push(s.slice(start+1, end));
+                continue;
+            } 
+            
+            // if (column.startsWith("PMIDs_"))
+            // {
+            // }
             row.push(source.data[column][i].toString())
+            
         }
-        lines.push(row.join(','))
+        lines.push(row.join('\t'))
     }
     return lines.join('\n').concat('\n')
 }
 
 
-const filename = dataset + '.result.csv'
+const filename = dataset + '.result.txt'
 const filetext = table_to_csv(source)
 const blob = new Blob([filetext], { type: 'text/csv;charset=utf-8;' })
 

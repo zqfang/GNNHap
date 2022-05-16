@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+<title>GNNHap</title>
+  <!-- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"> -->
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <!-- Custom Style -->
+  <link href="{{ url_for('static',filename='css/custom.min.css') }}" rel="stylesheet">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script type=text/javascript>
+          $(function() {
+            $('a#runcmd').on('click', function(e) {
+              // alert("Program is running 1");
+              e.preventDefault();
+              $("#btnSubmit").attr("disabled", true); // disable btn using jquery incase run multiple times
+              $("#status").html(`<span style="color:blue;font-weight:bold">Do not close this page !!!</span><br>
+                Program is running, it takes 5 ~ 20 mininutes typically. 
+                Take a coffee then come back. 
+                When finished, n permanent uniqu ID and link is return if program ends sucessfully. Just click and view the results.`);
+                $('#progressbar').attr('value', "70");
+              // when finished running
+              $.getJSON('/background_process',
+              function(data) {
+                // check program status here
+                $('#progressbar').attr('value', "100");
+                $('#uuid').html(`Your result ID and link is:  <a href="${data['url']}"> ${data['uuid']}</a>. Please save your link for later usage.`);
+                $("#status").html("Program run with status: <pre>" + data['status'] + "</pre");
+                $("#command").html("Command run: <pre><code>" + data['cmd'] + "</code></pre>");
+              });
+              // const button = document.querySelector('button');
+              // button.disabled = true;
+              return false;
+            });
+          });
+  </script>
+
+</head>
+
+
+<body>
+  <nav>
+    <a class="navbar" href="{{ url_for('index') }}">Home</a>
+    <a class="navbar" href="{{ url_for('results') }}">Results</a>
+    <a class="navbar" href="{{ url_for('graph') }}">Graph</a>
+    <a class="navbar" href="#">About</a>
+  </nav>
+  <div class="content" name="strain">
+    <h1>Welcome to GNNHap Server </h1>
+
+    <p>GNNHap is an AI-driven genetic discovery program for Inbred mice. </p>
+
+    <H3>Plealse check your inputs, then click run</H3>
+    <div class='content', id="myProgress">
+      <form>
+          <a href=# id=runcmd><button id="btnSubmit" class='btn btn-default'>Run</button></a>
+      </form>
+      <label for="file">Progress:</label>
+      <progress id="progressbar" max="100" value="20"> 20% </progress>
+
+      <p id="uuid"></p>
+      <p id="status"></p>
+      <div id="command"></div>
+    </div>
+
+    <h2> Input data </h2>
+    <div class="content">
+      <div name="gene_symbol">
+        <p>Gene Symbols: {{ gene_symbols }} </p>
+        <p>MeSH IDs: {{ mesh_terms }} </p>
+      </div>
+      <div>
+        {% if trait_data|length >= 1 %}
+        <p>Phenotypic data:</p>
+        <table>
+          <thead>
+              <tr>
+                  <th>Strain</th>
+                  <th>Strain Offical Name</th>
+                  <th>Values</th>
+              </tr>
+          </thead>
+          <tbody>
+            {% for k, v in trait_data.items() %}
+              <tr>
+                  <td>{{ k }}</td>
+                  <td>{{ strains[k] }}</td>
+                  <td> {{ v }}</td>
+              </tr>
+              {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

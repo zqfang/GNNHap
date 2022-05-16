@@ -1,38 +1,106 @@
-{% extends base %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
 
-{% block title %}HBCGM Data Visualization{% endblock %}
-
-{% block postamble %}
-  <script src="https://cdn.bokeh.org/bokeh/release/bokeh-mathjax-2.4.2.min.js"
-          crossorigin="anonymous"></script>
+<title>GNNHap HomePage</title>
   <!-- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"> -->
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
   <!-- Custom Style -->
-  <link href="webapp/static/css/custom.min.css" rel="stylesheet">
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.8.0/jszip.js"></script> -->
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.8.0/xlsx.js"></script> -->
+  <script src="static/js/reader.js"></script>
 
-{% endblock %}
+  <link href="{{ url_for('static',filename='css/custom.min.css') }}" rel="stylesheet">
+</head>
 
-{% block contents %}
+<body onload="init()">
+  <nav>
+    <a class="navbar" href="{{ url_for('index') }}">Home</a>
+    <a class="navbar" href="{{ url_for('results') }}">Results</a>
+    <a class="navbar" href="{{ url_for('graph') }}">Graph</a>
+    <a class="navbar" href="#">About</a>
+  </nav>
   <div class="content">
-    <h1>Welcome to GNNHap Data Visualization Server </h1>
-
+    <h1>Welcome to GNNHap Server </h1>
     <p>GNNHap is an AI-driven genetic discovery program for Inbred mice. </p>
-    <h2> Usage </h2>
-    <ol> 
-      <li>Input a new dataset name in the TextInputBox to update everything in this page</li>
-      <li>Select MeSH term to get literature score</li>
-      <li>Click DataTable row to highlight a gene</li>
-      <li>Click DataTable header to sort a column. Clicking one more time changes sort direction. <br>
-        Use Shift + click to sort multiple columns simultaneously. <br>
-        Use Ctrl + click to return to natural order.</li>
-      <li>Save DataTable by click download button.</li>
-      <li>Save Figures by click save widget below the plots.</li>
-    </ol> 
+    <p>Select one of the option to run</p>
+    <form method="post" id="inp" name="inpupload">
+      <div class="horizontal">
+        <!-- <form method="post" id="inp"> -->
+        <div style="text-align: left; width:350px;">
+        <h2>1: Run GNNHap prediction</h2>
+        <h3>Predition needs two input</h3>
+        <ol>
+          <li>MeSH term ID, e.g. D003337</li>
+          <li>A list of genes to prioritize</li>
+        </ol>
+        <p>Pleae input MeSH term ID and gene names below</p>
+        <button type="submit" name="bt" value="geneSubmit">Submit</button>
+        <p><b>Note:</b> Separate each term by row</p>
+        <!-- <form method="post" id="inp"> -->
+        <label for="mesh">MeSH Term</label><br>
+        <textarea name="mesh_term"
+                  placeholder="D003337"
+                  id="mesh_term"
+                  rows="15"
+                  cols="30"
+                  >{{ request.form["mesh_term"] }}</textarea><br>
+        
+        <p>Input a list of genenames </p>
+        <label for="genename">Gene Symbol</label> <br>
+        <textarea name="gene_symbol"
+                  placeholder="Draxin"
+                  id="gene_symbol"
+                  rows="15"
+                  cols="30"
+                  >{{ request.form["gene_symbol"] }}</textarea><br>
+        </div>
+        <div style="text-align: left; width:600px;">
+          <h2>2: Run GNNHap full pipeline</h2>
+          <h3> Two inputs are required</h3>
+          <ol>
+            <li>MeSH term ID, e.g. D003337</li>
+            <li>Strain measuments (phenotypic data) for genetic mapping (HBCGM)</li>
+          </ol>
+          <h3> Step 1. Enter MeSH term IDs</h3>
+          <p> Fill data on the left box</p>
+          <h3> Step 2. Input measuments, then submit</h3>
+          <button type="submit" name="btn" value="mannualSubmit">Submit</button><br><br>
+          <h4> Option 1: Upload a file to fill the form automatically</h4>
+          <!-- <form method="post" enctype="multipart/form-data" name="fileupload"> -->
+          <input type="file" name="file" id="dataInput" accept=".txt,.csv">
+            <!-- <pre id="dataContent"></pre> -->
+            <!-- <button type="submit" name="btn" value="fileSubmit">Submit</button> -->
+            <!-- </form> -->
+          <p><b>Note:</b>Only support txt, csv, xls, xlsx. An example file looks like this
+          <pre>
+            <code>
+              129P2 123
+              A_J 456
+              BALB 678
+            </code>
+          </pre>
+          </p>
 
-    <h2> Results </h2>
-    {{ super() }}
-
-
+          <h4> Option 2: Input measuments mannually</h4>
+          <p><b>Note:</b> Only accept numeric values. Leave a strain to be blank if there's phenotypic data </p>
+          {% for abbr, full in strains.items() %}
+          <label for="{{ abbr }}">{{ full }}</label>
+          <input type="number"
+                step="any" 
+                placeholder="{{ abbr }}"
+                class="strainTrait" 
+                name="{{ abbr }}" 
+                id="{{ abbr }}" 
+                value="{{ request.form[ abbr ] }}">
+          <br>
+          {% endfor %}
+        </div>
+      </div>
+    </form>
   </div>
-{% endblock %}
+  </div>
+</body>
+</html>
