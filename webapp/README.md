@@ -32,5 +32,5 @@ you need to update
 
 
 ## A Snapshot 
-![GNNHap](static/images/GNNHap.png)*
+![GNNHap](static/images/GNNHap.png)
 

@@ -140,3 +140,6 @@ you need to update
 - the `config.json` file for the web server
 - the `config.yaml` for gnnhap.smk to run haplomap
 
+## A Snapshot 
+![GNNHap](webapp/static/images/GNNHap.png)
+
