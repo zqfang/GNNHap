@@ -1,7 +1,6 @@
-# Bokeh app for Data Visualization of GNNHap output
+# Data visualization for GNNHap output
 
-This is a bokeh application for exploring GNNHap/HBCGM results interactively and download results.
-
+This is a flask+bokeh application for exploring GNNHap/HBCGM results interactively
 
 ## Installation
 
@@ -20,9 +19,8 @@ Modify the file path pattern if you'd like to use your own data.
 Example result files could be found in the `example/PeltzData` folder.
 
 
-debug  
+run with command 
 ```shell
-## --dev autoreload files 
 python app.py
 ```
 

@@ -131,7 +131,7 @@ python GNNHap/predict.py --bundle /path/to/GNNHap_Bundle  \
 set up correct path for all required files and programs.
 
 run
-```shell```
+```shell
 cd webapp
 python app.py
 ```
