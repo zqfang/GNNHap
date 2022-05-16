@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
 
-<title>GNNHap HomePage</title>
+<title>GNNHap Home</title>
   <!-- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"> -->
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
@@ -20,12 +20,13 @@
     <a class="navbar" href="{{ url_for('index') }}">Home</a>
     <a class="navbar" href="{{ url_for('results') }}">Results</a>
     <a class="navbar" href="{{ url_for('graph') }}">Graph</a>
-    <a class="navbar" href="#">About</a>
+    <a class="navbar" href="{{ url_for('about') }}">About</a>
   </nav>
   <div class="content">
     <h1>Welcome to GNNHap Server </h1>
     <p>GNNHap is an AI-driven genetic discovery program for Inbred mice. </p>
-    <p>Select one of the option to run</p>
+    <p> &#x1F42D: alpha version 0.1 </p>
+    <h2>Select one of the option to run</h2>
     <form method="post" id="inp" name="inpupload">
       <div class="horizontal">
         <!-- <form method="post" id="inp"> -->

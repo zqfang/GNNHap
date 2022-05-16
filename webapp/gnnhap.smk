@@ -29,6 +29,9 @@ STRAINS = sorted(config['STRAINS'])
 
 if 'MESH_TERMS' in config:
     MESH_TERMS = config['MESH_TERMS'].strip(",") ## input by --config MESH_TERMS="D003337"
+else:
+    MESH_TERMS = ""
+
 if 'UUID' in config:
     UUID = config['UUID'] 
 
@@ -54,16 +57,19 @@ VCF_DIR = config['HBCGM']['VCF_DIR']
 VEP_DIR = config['HBCGM']['VEP_DIR']
 # gene expression file
 GENE_EXPRS = config['HBCGM']['GENE_EXPRS']
-
-### OUTPUT
-
 CHROMOSOMES = [str(i) for i in range (1, 20)] + ['X'] # NO 'Y'
-# output files
 
-MESH = f"MPD_{UUID}_snp.results.mesh.txt"
-MESH_INDEL = f"MPD_{UUID}_indel.results.mesh.txt"
+### OUTPUT HBCGM
+FINAL_OUT = f"MPD_{UUID}_snp.results.txt"
+FINAL_OUT_INDEL = f"MPD_{UUID}_indel.results.txt"
+
+### OUTPUT GNNHAP
+if MESH_TERMS != "":
+    FINAL_OUT = f"MPD_{UUID}_snp.results.mesh.txt"
+    FINAL_OUT_INDEL = f"MPD_{UUID}_indel.results.mesh.txt"
+
 rule target:
-    input: MESH, MESH_INDEL
+    input: FINAL_OUT, FINAL_OUT_INDEL
 
 
 rule trait_data:
@@ -277,7 +283,7 @@ rule mesh:
         "--hbcgm_result_dir {params.res_dir} "
         "--mesh_terms {params.json} --num_cpus {threads} "
 
-rule mesh:
+rule mesh_indel:
     input: 
         res = "MPD_{ids}_indel.results.txt",
     output: "MPD_{ids}_indel.results.mesh.txt"

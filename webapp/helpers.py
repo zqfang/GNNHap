@@ -1,10 +1,65 @@
-import os, json
+import glob, os, subprocess, tempfile, os, json
 import numpy as np
 import pandas as pd
 from functools import lru_cache
 from pathlib import Path
-
 from bokeh.palettes import Category10
+
+## HELPERS
+STRAINS = {'129P2': '129P2/OlaHsd',
+        '129S1': '129S1/SvImJ',
+        '129S5': '129S5/SvEvBrd',
+        'A_J': 'A/J',
+        'AKR': 'AKR/J',
+        'B10': 'B10.D2-Hc<0> H2<d> H2-T18<c>/oSnJ',
+        'BALB': 'BALB/cJ',
+        'BPL': 'BPL/1J',
+        'BPN': 'BPN/3J',
+        'BTBR': 'BTBR T<+> Itpr3<tf>/J',
+        'BUB': 'BUB/BnJ',
+        'C3H': 'C3H/HeJ',
+        'C57BL10J': 'C57BL/10J',
+        'C57BL/6J': 'C57BL/6J',
+        'C57BL6NJ': 'C57BL/6NJ',
+        'C57BRcd': 'C57BR/cdJ',
+        'C57LJ': 'C57L/J',
+        'C58': 'C58/J',
+        'CAST': 'CAST/EiJ',
+        'CBA': 'CBA/J',
+        'CEJ': 'CE/J',
+        'DBA1J': 'DBA/1J',
+        'DBA': 'DBA/2J',
+        'FVB': 'FVB/NJ',
+        'ILNJ': 'I/LnJ',
+        'KK': 'KK/HlJ',
+        'LGJ': 'LG/J',
+        'LPJ': 'LP/J',
+        'MAMy': 'MA/MyJ',
+        'MOLF': 'MOLF/EiJ',
+        'MRL': 'MRL/MpJ',
+        'NOD': 'NOD/ShiLtJ',
+        'NON': 'NON/ShiLtJ',
+        'NOR': 'NOR/LtJ',
+        'NUJ': 'NU/J',
+        'NZB': 'NZB/BlNJ',
+        'NZO': 'NZO/HlLtJ',
+        'NZW': 'NZW/LacJ',
+        'PJ': 'P/J',
+        'PLJ': 'PL/J',
+        'PWD': 'PWD/PhJ',
+        'PWK': 'PWK/PhJ',
+        'RBF': 'RBF/DnJ',
+        'RFJ': 'RF/J',
+        'RHJ': 'RHJ/LeJ',
+        'RIIIS': 'RIIIS/J',
+        'SEA': 'SEA/GnJ',
+        'SJL': 'SJL/J',
+        'SMJ': 'SM/J',
+        'SPRET': 'SPRET/EiJ',
+        'ST': 'ST/bJ',
+        'SWR': 'SWR/J',
+        'TALLYHO': 'TALLYHO/JngJ',
+        'WSB': 'WSB/EiJ'}
 
 ## AAAS colors
 dict_color = {'0':'#3B4992',
@@ -19,6 +74,8 @@ dict_color = {'0':'#3B4992',
               '9':'#808180',
               '?':'#ffffff',#'#1B1919',}
              }
+
+
 expr_color = {'P':'#D13917', 'A': '#4C4A4B', 'M':'#ffffff', '-':'#ffffff'}
 codon_flag = {'0':'Synonymous','1':'Non-Synonymous','2':'Splicing', '3':'Stop', '-1':'Non-Coding'}
 codon_color_dict = {str(i) : Category10[10][i+1] for i in range(-1, 8)}
@@ -28,10 +85,7 @@ mesh_terms = {}
 with open("/data/bases/fangzq/Pubmed/mouse_gene2entrezid.json", 'r') as j:
     GENE2ENTREZ = json.load(j) 
 
-# ALLOWED_EXTENSIONS = {'txt', 'csv', 'xlsx', 'xls'}
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in {'txt', 'csv', 'xlsx', 'xls'}
+### functions ###
 
 
 def get_pubmed_link(pmids):
@@ -97,9 +151,6 @@ def load_ghmap(dataset):
     mesh_columns = [m for m in headers[-1] if m.startswith("MeSH") ]
     mx = mesh_columns[0] if len(mesh_columns) > 0 else "EffectSize"    
     df['LitScore'] = df[mx]
-
-    #pmid_columns = [ p for p in headers[-1] if p.startswith("PMIDs_")]
-
     return df, headers 
 
 
@@ -136,15 +187,8 @@ def get_datasets(data_dir):
     #     data.append(d)
     # return sorted(list(set(data)))
 
-
-def load_dat(uid):
-    global gene_expr_order
-    global mesh_terms
-    global codon_flag
-    ## 
-    DATASET = os.path.join(app.config['HBCGM_DIR'], f'{uid}.results.mesh.txt')
-
-    df, headers = load_ghmap(DATASET)
+def get_data(dataset):
+    df, headers = load_ghmap(dataset)
     df = df[df.CodonFlag>=0]
     if df.empty:
         print("No significant values loaded")
@@ -169,11 +213,50 @@ def load_dat(uid):
     dataset_name, codon_flag, gene_expr_order, strains, traits, mesh_terms = headers[:6]
     # if (dataset_name[0].lower().find("indel") != -1) or (dataset_name[0].lower().find("_sv") != -1):
     #     codon_flag = {'0':'Low','1':'Moderate','2':'High', '-1':'Modifier'}
-    x_range = list(range(0, len(strains)))
     if not mesh_terms: #  if empty 
         mesh_terms = {'EffectSize':'EffectSize'}
-
-    new_data = {'dataset_name': dataset_name, 'codon_flag': codon_flag, 'gene_expr_order': gene_expr_order,
-                'strains': strains, 'traits': traits, 'mesh_terms': mesh_terms,  'columns': _columns, 'mesh_columns':'mesh_columns',
+    new_data = {'dataset_name': dataset_name, 
+                'codon_flag': codon_flag, 
+                'gene_expr_order': gene_expr_order,
+                'strains': strains, 
+                'traits': traits, 
+                'mesh_terms': mesh_terms,  
+                'columns': _columns, 
+                'mesh_columns':mesh_columns,
                 'datasource': df.to_dict(orient='list'),}
     return new_data
+
+
+def read_trait(filename):
+    # out = []
+    suf = filename.lower().split(".")[-1]
+    # with open(filename, 'r') as inp:
+    #     for line in inp:
+    #         if line.startswith("#"): continue
+    #         line = line.strip().split()
+    #         out.append(out)
+    if suf == "txt":
+        out = pd.read_table(filename, comment="#")
+    elif suf == "csv":
+        out = pd.read_csv(filename, comment="#")
+    elif suf in ['xls','xlsx']:
+        out = pd.read_excel(filename, comment="#")
+    return out 
+
+def get_datasets(data_dir):
+    data = []
+    path = list(Path(data_dir).glob("*.results.mesh.txt")) + list(Path(data_dir).glob("*.results.txt"))
+    for p in path:
+        d = p.stem.split(".")[0]
+        data.append(d)
+    return sorted(list(set(data)))
+
+
+def symbol_check(symbols):
+    """
+    a simple checker if inputs are mouse genes or human
+    """
+    human = sum([s.isupper() for s in symbols])
+    if human / (len(symbols)) > 0.5:
+        return True
+    return False

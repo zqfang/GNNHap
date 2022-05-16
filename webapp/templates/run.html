@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
 
-<title>GNNHap</title>
+<title>GNNHap Run</title>
   <!-- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"> -->
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
@@ -18,17 +18,17 @@
               e.preventDefault();
               $("#btnSubmit").attr("disabled", true); // disable btn using jquery incase run multiple times
               $("#status").html(`<span style="color:blue;font-weight:bold">Do not close this page !!!</span><br>
-                Program is running, it takes 5 ~ 20 mininutes typically. 
-                Take a coffee then come back. 
-                When finished, n permanent uniqu ID and link is return if program ends sucessfully. Just click and view the results.`);
+                Program is running, it takes 5 ~ 20 mininutes typically. <br>
+                Take a coffee then come back. <br>
+                A permanent uniqu ID and link is return if program ends sucessfully. Just click and view the results.`);
                 $('#progressbar').attr('value', "70");
               // when finished running
               $.getJSON('/background_process',
               function(data) {
                 // check program status here
                 $('#progressbar').attr('value', "100");
-                $('#uuid').html(`Your result ID and link is:  <a href="${data['url']}"> ${data['uuid']}</a>. Please save your link for later usage.`);
-                $("#status").html("Program run with status: <pre>" + data['status'] + "</pre");
+                $('#uuid').html(`Your result's permanent ID and link:  <a href="${data['url']}"> ${data['uuid']}</a>. <br><strong>Please save your link (ID) for later usage !</strong>`);
+                $("#status").html(`Program run with status: <pre><code> ${data['status']}</code></pre`);
                 $("#command").html("Command run: <pre><code>" + data['cmd'] + "</code></pre>");
               });
               // const button = document.querySelector('button');
@@ -46,7 +46,7 @@
     <a class="navbar" href="{{ url_for('index') }}">Home</a>
     <a class="navbar" href="{{ url_for('results') }}">Results</a>
     <a class="navbar" href="{{ url_for('graph') }}">Graph</a>
-    <a class="navbar" href="#">About</a>
+    <a class="navbar" href="{{ url_for('about') }}">About</a>
   </nav>
   <div class="content" name="strain">
     <h1>Welcome to GNNHap Server </h1>

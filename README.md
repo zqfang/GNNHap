@@ -21,7 +21,7 @@ Graph Neural Network based Haplotype Prioritization for inbred mouse.
 
 ## Build Graph and Train Model
 
-if you would like to use our pretrain model, go to the prediction step
+if you would like to use our pretrain model, go to the prediction step or `web interface` step.
 
 #### 1. Download files
 
@@ -126,12 +126,17 @@ python GNNHap/predict.py --bundle /path/to/GNNHap_Bundle  \
             
 ```
 
-## DataVisualization
+## Run this program with a web interface ? 
 
+set up correct path for all required files and programs.
 
-set the `DATA_DIR` to your GNNHap output folder in the `main.py`, then run the following command:
-
-deployment  
+run
+```shell```
+cd webapp
+python app.py
 ```
-bokeh serve --show webapp --allow-websocket-origin=peltz-app-03:5006
-```
+
+you need to update 
+- the `config.json` file for the web server
+- the `config.yaml` for gnnhap.smk to run haplomap
+

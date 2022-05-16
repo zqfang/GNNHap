@@ -1,24 +1,17 @@
-
-from genericpath import exists
-from operator import indexOf
 import os, glob
 import numpy as np
 import pandas as pd
-from functools import partial
-from bokeh.plotting import figure, curdoc
+
+from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, TableColumn, DateFormatter, DataTable, HTMLTemplateFormatter, CellFormatter
-from bokeh.models import ColorBar, LinearColorMapper, LabelSet, Legend
-from bokeh.models import FixedTicker, RangeSlider, CDSView, BooleanFilter, GroupFilter, CustomJS
-from bokeh.models.glyphs import Patches
+from bokeh.models import FixedTicker, RangeSlider, CDSView, BooleanFilter, GroupFilter, CustomJS, Legend
 from bokeh.models.widgets import Select, TextInput, Dropdown, AutocompleteInput, Div, Button
 from bokeh.layouts import column, row
 
-from bokeh.palettes import Category10
-from bokeh.transform import factor_cmap, linear_cmap, factor_mark
-from bokeh.core.enums import MarkerType
-from helpers import gene_expr_order, codon_flag, mesh_terms
+
+from helpers import gene_expr_order, codon_flag, mesh_terms, STRAINS
 from helpers import load_ghmap, get_color, get_expr, get_datasets, get_pubmed_link
-from utils import STRAINS
+
 
 # dataset id
 class GNNHapResults:
@@ -167,8 +160,7 @@ class GNNHapResults:
                     var url = uid;
                     if (current_url[current_url.length -1] == "results")
                     {
-
-                        url = "HBCGM_DATA/" + uid;
+                        url = "HBCGM_DATA/" + uid; // update url to get json data
                     }
                     console.log(url);
                     var xmlhttp = new XMLHttpRequest(); // read file on the server side 
@@ -313,7 +305,7 @@ class GNNHapResults:
                     var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator/index.html?view=docsum&query=${pa}" target="_blank">${pa}</a>`;
                     pid_html.push(ps);
                 }
-                message.text = "<h3>PubMedIDs:</h3><p>" + pid_html.join(",") ; // + "</p><h3>Gene Expression:</h3>expr"
+                message.text = "<h3>PubMed Links:</h3><p>" + pid_html.join(",") ; // + "</p><h3>Gene Expression:</h3>expr"
             }    
             const pattern = source.data["Pattern"][selected_index];
             const pat_colors = [];
@@ -463,10 +455,9 @@ class GNNHapGraph:
                                 var url = uid;
                                 if (current_url[current_url.length -1] == "graph")
                                 {
-                                    url = "GRAPH_DATA/" + uid;
+                                    url = "GRAPH_DATA/" + uid; // update url when select dataset with different location
                                 }
                                 bool_filt.booleans = null;
-                                group_filt.group = null;
                                 var xmlhttp = new XMLHttpRequest(); // read file on the server side 
                                 // Define a callback function
                                 xmlhttp.onload = function() {
@@ -479,9 +470,8 @@ class GNNHapGraph:
                                         var new_set = new Set( new_data['data']['MeSH_Terms'] );
                                         var new_arr = Array.from(new_set);   
                                         meshid.options = new_arr;
-                                        meshid.value = new_arr[0];
-                                        console.log(new_arr);        
-                                        url = new_data['url'];
+                                        meshid.value = new_arr[0];  
+                                        group_filt.group = meshid.value;    
                                     }        
                                 }
                                 // Send a request
@@ -526,11 +516,38 @@ class GNNHapGraph:
                                 filt.group = imp;
                                 source.change.emit();
                                 """))
+
+    ### setup callbacks
+    def gene_update(self): # attr, old, new
+        self.source.selected.js_on_change('indices', CustomJS(args=dict(source=self.source, 
+                                                              message = self.message), 
+                                                              code="""
+            const selected_index = source.selected.indices[0];
+            var papers = source.data["PubMedID"][selected_index]; 
+            //console.log(papers);
+            var pid_html = [];
+            if ((papers != "Indirect") || (papers != "Unknown_Gene"))
+            {
+                //console.log(pid);
+                const pax = papers.split(",");
+                for (var j=0; j < pax.length; j++)
+                {
+                    var pa = pax[j];
+                    if (pa == "Indirect") continue;
+                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator/index.html?view=docsum&query=${pa}" target="_blank">${pa}</a>`;
+                    pid_html.push(ps);
+                }
+                message.text = "<h3>PubMed Links:</h3><p>" + pid_html.join(",") ; 
+            }        
+            source.change.emit();
+        """))
+
     def build_graph(self):
         # datatable
         self.data_update()
         self.mesh_update()
         self.slider_update()
+        self.gene_update()
         self.button.js_on_click(CustomJS(args=dict(source=self.myTable.source, 
                                                    dataset=self.dataset.value),
                                     code=open(os.path.join(os.path.dirname(__file__), "static/js/download.js")).read()))

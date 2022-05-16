@@ -26,12 +26,13 @@ debug
 python app.py
 ```
 
-view at: peltz-app-03:5006
+set up correct path for all required files and programs.
+
+you need to update 
+- the `config.json` file for the web server
+- the `config.yaml` for gnnhap.smk to run haplomap
 
 
 ## A Snapshot 
-![GNNHap](static/images/GNNHap.png)
+![GNNHap](static/images/GNNHap.png)*
 
-
-## Dev
-see guide [here](https://docs.bokeh.org/en/2.4.1/docs/user_guide/server.html)
