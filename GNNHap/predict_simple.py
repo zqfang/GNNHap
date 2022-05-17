@@ -161,6 +161,8 @@ class Simple:
         k = f"{entrzid}__{mesh}"
         if k in self.PUBMEDID:
             return ",".join(self.PUBMEDID[k])
+
+        ## TODO get shortest Path
         return "Indirect"
         
     def save(self, output:AnyStr):
@@ -181,7 +183,7 @@ class Simple:
             print(f"input data is empty: {result}")
             return case
         self._columns = list(case.columns) 
-        assert len(self._columns) >=2, "at least two columns input needed <GeneName, MeSH>"
+        assert len(self._columns) >=2, "at least two columns input needed <#GeneName, MeSH>"
         g, m = self._columns[:2] # first two column, gene, mesh
 
         if self.mouse2human is None:
@@ -193,6 +195,8 @@ class Simple:
         df = case.dropna(subset=['HumanEntrezID','GNodeIDX'])
         df.loc[df.index, 'GNodeIDX'] = df['GNodeIDX'].astype(int)
         df.loc[df.index, 'MNodeIDX'] = df['MNodeIDX'].astype(int)
+        # rename column name, to compatible with webapp
+        df.rename(columns = {g:'#GeneName', m: 'MeSH'}, inplace = True)
         return df
     
 

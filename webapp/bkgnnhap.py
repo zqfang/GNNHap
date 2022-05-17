@@ -1,13 +1,17 @@
 import os, glob
 import numpy as np
 import pandas as pd
+import networkx as nx
 
-from bokeh.plotting import figure
+from bokeh.plotting import figure, from_networkx
 from bokeh.models import ColumnDataSource, TableColumn, DateFormatter, DataTable, HTMLTemplateFormatter, CellFormatter
 from bokeh.models import FixedTicker, RangeSlider, CDSView, BooleanFilter, GroupFilter, CustomJS, Legend
 from bokeh.models.widgets import Select, TextInput, Dropdown, AutocompleteInput, Div, Button
 from bokeh.layouts import column, row
 
+from bokeh.models import Range1d, Circle, MultiLine, EdgesAndLinkedNodes, NodesAndLinkedEdges, LabelSet
+from bokeh.palettes import Blues8, Reds8, Purples8, Oranges8, Viridis8, Spectral8
+from bokeh.transform import linear_cmap
 
 from helpers import gene_expr_order, codon_flag, mesh_terms, STRAINS
 from helpers import load_ghmap, get_color, get_expr, get_datasets, get_pubmed_link
@@ -381,6 +385,84 @@ class GNNHapResults:
             source.change.emit();
             sca.change.emit();"""))
 
+
+    def graph(self, G0):
+        G = G0.copy()
+        degrees = dict(nx.degree(G))
+        nx.set_node_attributes(G, name='degree', values=degrees)
+
+        adjusted_node_size = dict([(node, np.clip(degree, a_max=100, a_min=5)) for node, degree in nx.degree(G)])
+        nx.set_node_attributes(G, name='adjusted_node_size', values=adjusted_node_size)
+
+        #Choose colors for node and edge highlighting
+        node_highlight_color = 'white'
+        edge_highlight_color = 'black'
+
+        #Choose attributes from G network to size and color by — setting manual size (e.g. 10) or color (e.g. 'skyblue') also allowed
+        size_by_this_attribute = 'adjusted_node_size'
+        color_by_this_attribute = 'node_type_color'
+
+        #Pick a color palette — Blues8, Reds8, Purples8, Oranges8, Viridis8
+        color_palette = Blues8
+
+        #Choose a title!
+        title = '1-hop Network'
+
+        #Establish which categories will appear when hovering over each node
+        HOVER_TOOLTIPS = [
+            ("Name", "@node_name"),
+            #("Degree", "@degree"),
+            ("NodeType", "@node_type"),
+            ("NodeColor", "$color[swatch]:node_type_color"),
+        ]
+
+        #Create a plot — set dimensions, toolbar, and title
+        plot = figure(tooltips = HOVER_TOOLTIPS, width=800, height=600,
+                    tools="pan,wheel_zoom,save,reset", active_scroll='wheel_zoom',
+                    x_range=Range1d(-10.1, 10.1), y_range=Range1d(-10.1, 10.1), title=title)
+
+        #Create a network graph object
+        # https://networkx.github.io/documentation/networkx-1.9/reference/generated/networkx.drawing.layout.spring_layout.html
+        network_graph = from_networkx(G, nx.spring_layout, scale=10, center=(0, 0))
+
+        #Set node sizes and colors according to node degree (color as category from attribute)
+        network_graph.node_renderer.glyph = Circle(size=size_by_this_attribute, 
+                                                fill_color=color_by_this_attribute)
+        #Set node highlight colors
+        network_graph.node_renderer.hover_glyph = Circle(size=size_by_this_attribute, 
+                                                        fill_color=node_highlight_color, 
+                                                        line_width=2)
+        network_graph.node_renderer.selection_glyph = Circle(size=size_by_this_attribute, 
+                                                            fill_color=node_highlight_color, 
+                                                            line_width=2)
+
+        #Set edge opacity and width
+        network_graph.edge_renderer.glyph = MultiLine(line_alpha=0.5, 
+                                                    line_width=1)
+        #Set edge highlight colors
+        network_graph.edge_renderer.selection_glyph = MultiLine(line_color=edge_highlight_color, 
+                                                                line_width=2)
+        network_graph.edge_renderer.hover_glyph = MultiLine(line_color=edge_highlight_color, 
+                                                            line_width=2)
+
+        #Highlight nodes and edges
+        network_graph.selection_policy = NodesAndLinkedEdges()
+        network_graph.inspection_policy = NodesAndLinkedEdges()
+
+        plot.renderers.append(network_graph)
+
+
+        #Add Labels
+        x, y = zip(*network_graph.layout_provider.graph_layout.values()) # node x, y positions
+        node_ = list(G.nodes()) # node id
+        source = ColumnDataSource({'x': x, 'y': y, 'name': nx.get_node_attributes(G,'node_name')})
+        labels = LabelSet(x='x', y='y', text='name', source=source, 
+                        background_fill_color='white', 
+                        text_font_size='10px', 
+                        background_fill_alpha=.7)
+        plot.renderers.append(labels)
+        return plot
+
     def build(self,):    
         # datatable
         self.data_update()
@@ -437,7 +519,7 @@ class GNNHapGraph:
         self.view = CDSView(source=self.source, filters=[self.bool_filter, self.group_filter ])
 
         ## Datatable
-        self._columns = ["#GeneName",	"MeSH", "HumanEntrezID", "MeSH_Terms", "LiteratureScore", "PubMedID"] 
+        self._columns = ["#GeneName", "MeSH", "HumanEntrezID", "MeSH_Terms", "LiteratureScore", "PubMedID"] 
         columns = [ TableColumn(field=c, title=c, formatter=HTMLTemplateFormatter()) for c in self._columns ] # skip index                      
         self.myTable = DataTable(source=self.source, columns=columns, 
                             width =800, height = 600, index_position=0,
