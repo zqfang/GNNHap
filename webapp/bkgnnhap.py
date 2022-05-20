@@ -4,21 +4,143 @@ import pandas as pd
 import networkx as nx
 
 from bokeh.plotting import figure, from_networkx
-from bokeh.models import ColumnDataSource, TableColumn, DateFormatter, DataTable, HTMLTemplateFormatter, CellFormatter
-from bokeh.models import FixedTicker, RangeSlider, CDSView, BooleanFilter, GroupFilter, CustomJS, Legend
-from bokeh.models.widgets import Select, TextInput, Dropdown, AutocompleteInput, Div, Button
+from bokeh.models import ColumnDataSource, TableColumn, DataTable, HTMLTemplateFormatter, CellFormatter
+from bokeh.models import RangeSlider, CDSView, BooleanFilter, GroupFilter, CustomJS, Legend
+from bokeh.models.widgets import Select, TextInput, AutocompleteInput, Div, Button
 from bokeh.layouts import column, row
 
-from bokeh.models import Range1d, Circle, MultiLine, EdgesAndLinkedNodes, NodesAndLinkedEdges, LabelSet
-from bokeh.palettes import Blues8, Reds8, Purples8, Oranges8, Viridis8, Spectral8
-from bokeh.transform import linear_cmap
+from bokeh.models import Range1d, Scatter, MultiLine, EdgesAndLinkedNodes, NodesAndLinkedEdges, LabelSet
+from bokeh.models import GraphRenderer, StaticLayoutProvider
+from bokeh.palettes import Spectral3, Spectral8
+# from bokeh.transform import linear_cmap
 
-from helpers import gene_expr_order, codon_flag, mesh_terms, STRAINS
-from helpers import load_ghmap, get_color, get_expr, get_datasets, get_pubmed_link
+from helpers import gene_expr_order, codon_flag, mesh_terms
+from helpers import load_ghmap, get_html_links
 
 
-# dataset id
-class GNNHapResults:
+class Graph:
+    """
+    graph visualization using bokeh
+    """
+    def __init__(self, graph_data_dict=None):
+        self._graph() # build graph
+
+        ## init graph
+        if graph_data_dict is None:
+            self._graph_init()
+        else:
+            self.graph.node_renderer.data_source.data =  graph_data_dict['node_data']
+            self.graph.edge_renderer.data_source.data =  graph_data_dict['edge_data']
+            self.graph.layout_provider.graph_layout =  graph_data_dict['graph_layout']
+    def _graph(self):
+        """
+        build graph components
+        """
+        #Choose colors for node and edge highlighting
+        node_highlight_color = 'white'
+        edge_highlight_color = 'black'
+
+        #Choose attributes from G network to size and color by — setting manual size (e.g. 10) or color (e.g. 'skyblue') also allowed
+        size_by_this_attribute = 'node_size_adjust'
+        color_by_this_attribute = 'node_type_color'
+        #Establish which categories will appear when hovering over each node
+        HOVER_TOOLTIPS = [
+            ("Name", "@node_name"),
+            ("NodeType", "@node_type"),
+            ("Degree", "@node_degree"),
+                #("NodeColor", "$color[swatch]:node_type_color"),
+        ]
+        #Create a plot — set dimensions, toolbar, and title
+        plot = figure(tooltips = HOVER_TOOLTIPS, frame_width=550, frame_height=450,
+                    #output_backend="svg", #"webgl",  
+                    tools="pan,wheel_zoom,save,reset", 
+                    active_scroll='wheel_zoom',
+                    x_range=Range1d(-10.1, 10.1),
+                    y_range=Range1d(-10.1, 10.1),
+                    x_axis_location=None, 
+                    y_axis_location=None,
+                    toolbar_location="above",
+                    title="Gene-MeSH 1-hop Subgraph")
+        plot.toolbar.logo = None
+
+        graph = GraphRenderer()
+        #Set node sizes and colors according to node degree (color as category from attribute)
+        graph.node_renderer.glyph = Scatter(size=size_by_this_attribute, 
+                                            fill_color=color_by_this_attribute, 
+                                            marker="node_marker")
+        #Set node highlight colors
+        graph.node_renderer.hover_glyph = Scatter(size=size_by_this_attribute, 
+                                                  fill_color=node_highlight_color, 
+                                                  line_width=2)
+        graph.node_renderer.selection_glyph = Scatter(size=size_by_this_attribute, 
+                                                      fill_color=node_highlight_color, 
+                                                      line_width=2)
+        #Set edge opacity and width
+        graph.edge_renderer.glyph = MultiLine(line_alpha=0.5, #line_color="edge_color",
+                                              line_width="edge_weight_adjust")
+        #Set edge highlight colors
+        graph.edge_renderer.selection_glyph = MultiLine(line_color=edge_highlight_color, 
+                                                        line_width=2)
+        graph.edge_renderer.hover_glyph = MultiLine(line_color=edge_highlight_color,  
+                                                    line_width=2)
+
+        #Highlight nodes and edges
+        graph.selection_policy = NodesAndLinkedEdges()
+        graph.inspection_policy = NodesAndLinkedEdges() # EdgesAndLinkedNodes()# 
+        plot.renderers.append(graph)
+        # ##Add Node labels
+        # node x, y positions
+        labels = LabelSet(x='x', y='y', text='node_name', 
+                          source=graph.node_renderer.data_source, 
+                          background_fill_color='white', 
+                          text_font_size='12px', 
+                          background_fill_alpha=.7)
+        plot.renderers.append(labels)
+        self.graph = graph 
+        self.graphplot = plot
+
+    def _graph_init(self):
+        """
+        only used for inititiation when no input graph data are given
+        """
+        N = 8
+        node_indices = list(range(N))
+        # generate ellipses based on the ``node_indices`` list
+        circ = [i*2*np.pi/8 for i in node_indices]
+
+        # create lists of x- and y-coordinates
+        x = [np.cos(i) for i in circ]
+        y = [np.sin(i) for i in circ]
+        # assign a palette to ``fill_color`` and add it to the data source
+        node_indices = ['C'+str(i) for i in node_indices]
+        self.graph.node_renderer.data_source.data = dict(
+            index=node_indices,
+            node_type_color=Spectral8,
+            node_size_adjust = [10]*N,
+            #node_type_color=['black']*N,
+            node_marker=['circle']*N, 
+            node_name = [str(i) for i in node_indices],
+            x=x, 
+            y=y)
+
+        # add the rest of the assigned values to the data source
+        self.graph.edge_renderer.data_source.data = dict(
+            start=['C0']*N,
+            end=node_indices,
+            edge_weight_adjust=[2]*N)
+        # convert the ``x`` and ``y`` lists into a dictionary of 2D-coordinates
+        # and assign each entry to a node on the ``node_indices`` list
+        graph_layout = dict(zip(node_indices, zip(x, y)))
+        # use the provider model to supply coourdinates to the graph
+        self.graph.layout_provider = StaticLayoutProvider(graph_layout=graph_layout)
+
+
+
+
+class GNNHapResults(Graph):
+    """
+    visualitzation of GNNHap results
+    """
     def __init__(self, data_dir, dataset=None):
         ### setup data and plots
         ## data
@@ -74,20 +196,22 @@ class GNNHapResults:
         columns = [ TableColumn(field=c, title=c, formatter=HTMLTemplateFormatter() 
                                 if c in ['Haplotype','GeneName', 'PubMed'] else CellFormatter()) for c in columns ] # skip index  
         self.columns = columns                     
-        self.myTable = DataTable(source=self.source, columns=columns, width =1200, height = 600, index_position=0,
+        self.myTable = DataTable(source=self.source, columns=columns, width =1200, height = 400, index_position=0,
                             editable = False, view=self.view, name="DataTable",sizing_mode="stretch_width") # autosize_mode="fit_viewport"
+        
 
         # download
         self.button = Button(label="Download Table", button_type="success")
         self.barplot()
         self.scatterplot()
-        
+        graph_data_dict=None
+        super(GNNHapResults, self).__init__(graph_data_dict=graph_data_dict)
         # self.data_update(dataset)
     ## bar plot
     def barplot(self,):
-        bar = figure(plot_width=550, plot_height=500, # x_range=strains, 
+        bar = figure(plot_width=600, plot_height=300, # x_range=strains, 
                 title="Dataset", 
-                toolbar_location="below",
+                toolbar_location="above",
                 x_range=self.source_bar.data['strains'],
                 tools='pan,reset,lasso_select,save', output_backend="svg", name="Bar")
         bar.toolbar.logo = None
@@ -113,17 +237,17 @@ class GNNHapResults:
             ("GeneName", "@GeneName{safe}"), # use the {safe} format after the column name to disable the escaping of HTML
             ("Impact", "@Impact")]
 
-        sca = figure(plot_width=550, plot_height=500, 
+        sca = figure(frame_width=550, frame_height=450,  ## note: frame_* is the pixls of axes (not including axis, legend) region
                     tools="pan,box_zoom,reset,lasso_select,save",
                     output_backend="svg",  
                     #active_drag="lasso_select",
-                    toolbar_location="below",
+                    toolbar_location="above",
                     tooltips=TOOLTIPS, name='Scatter',
                     x_axis_label= "Genetic:  - log10 Pvalue",
                     y_axis_label= "Literature Score")
 
-        sca.add_layout(Legend(), 'above') # put legend outside
-        sca.legend.orientation = "horizontal"
+        sca.add_layout(Legend(), 'right') # put legend outside
+        #sca.legend.orientation = "horizontal"
         sca.toolbar.logo = None
 
         sca.scatter('logPvalue', 'LitScore', 
@@ -193,6 +317,7 @@ class GNNHapResults:
                                 sca.title.text = new_data['mesh_columns'][0];
                                 var tmp = new_data['mesh_columns'][0].split("_");
                                 var pubc = "PMIDs_" + tmp[tmp.length-1];
+                                console.log(pubc);
                                 new_data['datasource']['PubMed']= new_data['datasource'][pubc];
                             }
                             source.data = new_data['datasource'];
@@ -279,7 +404,9 @@ class GNNHapResults:
                                                               meshid=self.meshid,
                                                               expr = self.exprs,
                                                               codon=self.codon,
-                                                              source_codon=self.source_codon), 
+                                                              source_codon=self.source_codon,
+                                                              graph=self.graph,
+                                                              genemeshplot=self.graphplot), 
                                                               code="""
             var columns = source.columns(); 
             const nrows = source.get_length();
@@ -309,7 +436,7 @@ class GNNHapResults:
                     var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator/index.html?view=docsum&query=${pa}" target="_blank">${pa}</a>`;
                     pid_html.push(ps);
                 }
-                message.text = "<h3>PubMed Links:</h3><p>" + pid_html.join(",") ; // + "</p><h3>Gene Expression:</h3>expr"
+                message.text = "<div><h3>PubMed Links:</h3><pre>" + pid_html.join(",") +"</pre></div>" ;
             }    
             const pattern = source.data["Pattern"][selected_index];
             const pat_colors = [];
@@ -330,11 +457,25 @@ class GNNHapResults:
                 pat_colors.push(dict_color[p]);
             }
             bar.data["colors"] = pat_colors;
+
+            var gene_id = source.data["HumanEntrezID"][selected_index];
+            var mesh_id = mesh_terms.data[meshid.value][0];
+            // get json data
+            $.getJSON(`/graph_process/${gene_id}_${mesh_id}`,
+              function(data) {
+                // update graph data here
+                graph.node_renderer.data_source.data = data['node_data'];
+                graph.edge_renderer.data_source.data = data['edge_data'];
+                graph.layout_provider.graph_layout = data['graph_layout'];
+              });
             source.change.emit();
-            //symbol.change.emit();
-            //litscore.change.emit();
-            //pval.change.emit();
-            //codon.change.emit();
+            graph.change.emit();
+            genemeshplot.change.emit();
+
+
+
+
+            source.change.emit();
             bar.change.emit();
         """))
 
@@ -385,84 +526,6 @@ class GNNHapResults:
             source.change.emit();
             sca.change.emit();"""))
 
-
-    def graph(self, G0):
-        G = G0.copy()
-        degrees = dict(nx.degree(G))
-        nx.set_node_attributes(G, name='degree', values=degrees)
-
-        adjusted_node_size = dict([(node, np.clip(degree, a_max=100, a_min=5)) for node, degree in nx.degree(G)])
-        nx.set_node_attributes(G, name='adjusted_node_size', values=adjusted_node_size)
-
-        #Choose colors for node and edge highlighting
-        node_highlight_color = 'white'
-        edge_highlight_color = 'black'
-
-        #Choose attributes from G network to size and color by — setting manual size (e.g. 10) or color (e.g. 'skyblue') also allowed
-        size_by_this_attribute = 'adjusted_node_size'
-        color_by_this_attribute = 'node_type_color'
-
-        #Pick a color palette — Blues8, Reds8, Purples8, Oranges8, Viridis8
-        color_palette = Blues8
-
-        #Choose a title!
-        title = '1-hop Network'
-
-        #Establish which categories will appear when hovering over each node
-        HOVER_TOOLTIPS = [
-            ("Name", "@node_name"),
-            #("Degree", "@degree"),
-            ("NodeType", "@node_type"),
-            ("NodeColor", "$color[swatch]:node_type_color"),
-        ]
-
-        #Create a plot — set dimensions, toolbar, and title
-        plot = figure(tooltips = HOVER_TOOLTIPS, width=800, height=600,
-                    tools="pan,wheel_zoom,save,reset", active_scroll='wheel_zoom',
-                    x_range=Range1d(-10.1, 10.1), y_range=Range1d(-10.1, 10.1), title=title)
-
-        #Create a network graph object
-        # https://networkx.github.io/documentation/networkx-1.9/reference/generated/networkx.drawing.layout.spring_layout.html
-        network_graph = from_networkx(G, nx.spring_layout, scale=10, center=(0, 0))
-
-        #Set node sizes and colors according to node degree (color as category from attribute)
-        network_graph.node_renderer.glyph = Circle(size=size_by_this_attribute, 
-                                                fill_color=color_by_this_attribute)
-        #Set node highlight colors
-        network_graph.node_renderer.hover_glyph = Circle(size=size_by_this_attribute, 
-                                                        fill_color=node_highlight_color, 
-                                                        line_width=2)
-        network_graph.node_renderer.selection_glyph = Circle(size=size_by_this_attribute, 
-                                                            fill_color=node_highlight_color, 
-                                                            line_width=2)
-
-        #Set edge opacity and width
-        network_graph.edge_renderer.glyph = MultiLine(line_alpha=0.5, 
-                                                    line_width=1)
-        #Set edge highlight colors
-        network_graph.edge_renderer.selection_glyph = MultiLine(line_color=edge_highlight_color, 
-                                                                line_width=2)
-        network_graph.edge_renderer.hover_glyph = MultiLine(line_color=edge_highlight_color, 
-                                                            line_width=2)
-
-        #Highlight nodes and edges
-        network_graph.selection_policy = NodesAndLinkedEdges()
-        network_graph.inspection_policy = NodesAndLinkedEdges()
-
-        plot.renderers.append(network_graph)
-
-
-        #Add Labels
-        x, y = zip(*network_graph.layout_provider.graph_layout.values()) # node x, y positions
-        node_ = list(G.nodes()) # node id
-        source = ColumnDataSource({'x': x, 'y': y, 'name': nx.get_node_attributes(G,'node_name')})
-        labels = LabelSet(x='x', y='y', text='name', source=source, 
-                        background_fill_color='white', 
-                        text_font_size='10px', 
-                        background_fill_alpha=.7)
-        plot.renderers.append(labels)
-        return plot
-
     def build(self,):    
         # datatable
         self.data_update()
@@ -478,19 +541,18 @@ class GNNHapResults:
         ## set up layout
         inputs = row(self.dataset, self.meshid, self.impact, )
         # curdoc.add_root(inputs)
-        figs = row(self.bar, self.sca)
+        figs = row(self.graphplot, self.sca)
         #figs = row(robj1, robj2)
-        figs2 = column(figs, self.myTable)
         # curdoc.add_root(figs2)
-        robj4 = column(self.button, self.symbol, self.pval, self.codon, self.slider, self.message, self.exprs)
-        o = row(figs2, robj4)
-        layout = column(inputs, o)
+        info = column(self.button, self.symbol, self.pval, self.codon, self.slider) # self.exprs
+        
+        layout = column(inputs, row(self.bar, info, self.message), figs, self.myTable)
 
         return layout
 
 # dataset id
-class GNNHapGraph:
-    def __init__(self, data_dir, dataset=None):
+class GNNHapGraph(Graph):
+    def __init__(self, data_dir, dataset=None, graph_data_dict=None):
         ### setup data and plots
         ## data
         DATASETS = glob.glob(data_dir+"**/*.gnn.txt")
@@ -501,6 +563,7 @@ class GNNHapGraph:
             dataset = dataset + ".gnn.txt"
         self.DATA_DIR = data_dir
         df = pd.read_table(os.path.join(data_dir, dataset))
+        df['GeneName'] = df['#GeneName'].apply(get_html_links)
         self.source = ColumnDataSource(df)
         self.dataset = AutocompleteInput(completions=DATASETS2, #value="MPD_26711-f_Indel",width=550,
                                 title="Dataset:", value=dataset, width=550,)
@@ -512,19 +575,23 @@ class GNNHapGraph:
         # groupfilter options
         # message box
         self.message = Div(text="""<h3> Message: <br> </h3>""", width=300, height=150)
-        self.slider = RangeSlider(title="LitScore Range", start=0.0, end=1.0, value=(0.5, 1.0), step=0.01)
+        self.slider = RangeSlider(title="Literature Score Range", start=0.0, end=1.0, value=(0.5, 1.0), step=0.01)
         # data view
         self.bool_filter = BooleanFilter()
         self.group_filter = GroupFilter()
         self.view = CDSView(source=self.source, filters=[self.bool_filter, self.group_filter ])
 
         ## Datatable
-        self._columns = ["#GeneName", "MeSH", "HumanEntrezID", "MeSH_Terms", "LiteratureScore", "PubMedID"] 
+        self._columns = ["GeneName", "HumanEntrezID", "MeSH_Terms", "LiteratureScore", "PubMedID"] 
         columns = [ TableColumn(field=c, title=c, formatter=HTMLTemplateFormatter()) for c in self._columns ] # skip index                      
         self.myTable = DataTable(source=self.source, columns=columns, 
-                            width =800, height = 600, index_position=0,
+                            width =600, height = 500, index_position=0,
                             editable = True, view=self.view, name="DataTable",
                             sizing_mode="stretch_width") # autosize_mode="fit_viewport"
+        ## init gene mesh graph
+        super(GNNHapGraph,self).__init__(graph_data_dict)
+        
+
     def data_update(self):
         self.dataset.js_on_change('value',  CustomJS(args=dict(source=self.source, 
                                 bool_filt=self.bool_filter,
@@ -602,7 +669,9 @@ class GNNHapGraph:
     ### setup callbacks
     def gene_update(self): # attr, old, new
         self.source.selected.js_on_change('indices', CustomJS(args=dict(source=self.source, 
-                                                              message = self.message), 
+                                                              message = self.message,
+                                                              graph=self.graph,
+                                                              genemeshplot=self.graphplot), 
                                                               code="""
             const selected_index = source.selected.indices[0];
             var papers = source.data["PubMedID"][selected_index]; 
@@ -619,9 +688,21 @@ class GNNHapGraph:
                     var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator/index.html?view=docsum&query=${pa}" target="_blank">${pa}</a>`;
                     pid_html.push(ps);
                 }
-                message.text = "<h3>PubMed Links:</h3><p>" + pid_html.join(",") ; 
+                message.text = "<pre><h3>PubMed Links:</h3><p>" + pid_html.join(",") +"</p></pre>"; 
             }        
+            var gene_id = source.data["HumanEntrezID"][selected_index];
+            var mesh_id = source.data["MeSH"][selected_index];
+            // get json data
+            $.getJSON(`/graph_process/${gene_id}_${mesh_id}`,
+              function(data) {
+                // update graph data here
+                graph.node_renderer.data_source.data = data['node_data'];
+                graph.edge_renderer.data_source.data = data['edge_data'];
+                graph.layout_provider.graph_layout = data['graph_layout'];
+              });
             source.change.emit();
+            graph.change.emit();
+            genemeshplot.change.emit();
         """))
 
     def build_graph(self):
@@ -640,9 +721,8 @@ class GNNHapGraph:
         widgt = row(inputs, self.message)
         # widgt = row(inputs, download)
         #figs = row(robj1, robj2)
-        layout = column(widgt, self.myTable)
+        tab = row(self.myTable, self.graphplot)
+        layout = column(widgt, tab)
         return layout
 
     
-
-

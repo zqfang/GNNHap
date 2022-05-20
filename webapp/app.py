@@ -1,13 +1,16 @@
 
 import os, uuid, subprocess, re, json, tempfile
+import numpy as np
 import pandas as pd
-
+import networkx as nx
 from flask import Flask, flash, request, redirect, url_for, render_template, jsonify
 from werkzeug.utils import secure_filename
 from bokeh.embed import components
 from bokeh.resources import INLINE
+
 from bkgnnhap import GNNHapResults, GNNHapGraph
-from helpers import STRAINS, read_trait, get_data, symbol_check
+from helpers import STRAINS, read_trait, get_data, symbol_check, get_common_neigbhor_subgraph, get_html_links
+# from bokeh.palettes import Spectral8
 
 app = Flask(__name__)
 
@@ -18,6 +21,7 @@ app.config.from_file("config.json", load=json.load)
 TRAIT_DATA = {}
 MESH_TERM = ""
 GENE_SYMBOL = ""
+GENE_MESH_GRAPH = nx.read_gpickle(app.config['GENE_MESH_GRAPH'])
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -239,7 +243,7 @@ def graph():
     """
     read dataset and render page when open url "/graph". This page could select all datasets that avaible to show
     """
-    g = GNNHapGraph(data_dir=app.config['GRAPH_DIR'], dataset=None)
+    g = GNNHapGraph(data_dir=app.config['GRAPH_DIR'], dataset=None, graph_data_dict=None)
     layout = g.build_graph()
     js_resources = INLINE.render_js()
     css_resources = INLINE.render_css()
@@ -265,10 +269,11 @@ def graph_uid(uid):
         # data_dir = os.path.join(data_dir, _uid)
         #TODO: read results in a subfolder
         df = pd.read_table(os.path.join(app.config['GRAPH_DIR'], uid))
+        df['GeneName'] = df['#GeneName'].apply(get_html_links)
         return jsonify({'url': f"/GRAPH_DATA/{uid}",
                         'data': df.to_dict(orient='list')})
     # now read data
-    g = GNNHapGraph(data_dir=data_dir, dataset=uid)
+    g = GNNHapGraph(data_dir=data_dir, dataset=uid, graph_data_dict=None)
     layout = g.build_graph()
     js_resources = INLINE.render_js()
     css_resources = INLINE.render_css()
@@ -298,7 +303,51 @@ def data_uid(uid):
 
 
 
+@app.route('/graph_process/<gene>_<meshid>')
+def graph_process(gene, meshid):
+    """
+    update graph data using networkx
+    """
+    return jsonify(get_common_neigbhor_subgraph(GENE_MESH_GRAPH, gene, meshid))
+    # # ## testing
+    # N = 8
+    # node_indices = list(range(N))
+    # # generate ellipses based on the ``node_indices`` list
+    # circ = [i*2*np.pi/8 for i in node_indices]
+
+    # # create lists of x- and y-coordinates
+    # x = [np.cos(i)*np.random.randint(low=1, high=10) for i in circ]
+    # y = [np.sin(i)*np.random.randint(low=1, high=10) for i in circ]
+    # node_indices = ['C'+str(i) for i in node_indices]
+    # # # assign a palette to ``fill_color`` and add it to the data source
+    # node_data = dict(
+    #         index=node_indices,
+    #         node_type_color=Spectral8,
+    #         node_size_adjust = [10]*N,
+    #         #node_type_color=['black']*N,
+    #         node_marker=['circle']*N, 
+    #         node_name = [str(i) for i in node_indices],
+    #         x=x, 
+    #         y=y)
+
+    #     # add the rest of the assigned values to the data source
+    # edge_data = dict(
+    #         start=['C0']*N,
+    #         end=node_indices,
+    #         edge_weight_adjust=[2]*N)
+
+
+    # # convert the ``x`` and ``y`` lists into a dictionary of 2D-coordinates
+    # # and assign each entry to a node on the ``node_indices`` list
+    # graph_layout = dict(zip(node_indices, zip(x, y)))
+
+
+    # return jsonify({'node_data': node_data,
+    #                 'edge_data': edge_data,
+    #                 'graph_layout': graph_layout })
+
+
 if __name__ == '__main__':
-    app.run(debug=True, 
+    app.run(debug=False, 
             host="0.0.0.0", 
             port=5006)

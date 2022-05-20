@@ -1,9 +1,11 @@
-import glob, os, subprocess, tempfile, os, json
+import glob, os, json
 import numpy as np
 import pandas as pd
+import networkx as nx
 from functools import lru_cache
 from pathlib import Path
 from bokeh.palettes import Category10
+from bokeh.plotting import from_networkx
 
 ## HELPERS
 STRAINS = {'129P2': '129P2/OlaHsd',
@@ -149,7 +151,10 @@ def load_ghmap(dataset):
     df['CodonColor'] = df['CodonFlag'].astype(str).map(codon_color_dict)
      
     mesh_columns = [m for m in headers[-1] if m.startswith("MeSH") ]
-    mx = mesh_columns[0] if len(mesh_columns) > 0 else "EffectSize"    
+    mx = "EffectSize"
+    if len(mesh_columns) > 0: 
+        mx = mesh_columns[0]    
+        df['PubMed'] = df.loc[:, mx.replace("MeSH", "PMIDs")]
     df['LitScore'] = df[mx]
     return df, headers 
 
@@ -260,3 +265,34 @@ def symbol_check(symbols):
     if human / (len(symbols)) > 0.5:
         return True
     return False
+
+
+def get_common_neigbhor_subgraph(H, entrezid, meshid):
+    neighbors = list(nx.common_neighbors(H, entrezid, meshid )) + [entrezid, meshid]
+    sg = nx.subgraph(H, neighbors).copy()
+    # pos = nx.layout.spring_layout(sx, k=5)
+    degrees = dict(nx.degree(sg))
+    nx.set_node_attributes(sg, name='degree', values=degrees)
+    adjusted_node_size = dict([(node, int(np.clip(degree, a_max=100, a_min=10))) for node, degree in degrees.items()])
+    nx.set_node_attributes(sg, name='node_size_adjust', values=adjusted_node_size)
+    #Create a network graph object
+    # https://networkx.github.io/documentation/networkx-1.9/reference/generated/networkx.drawing.layout.spring_layout.html
+    network_graph = from_networkx(sg, nx.spring_layout, k=6, scale=4, center=(0, 0))
+    node_data = network_graph.node_renderer.data_source.data
+    xs = []
+    ys = []
+    graph_layout = {}
+    for n in node_data['index']:
+        x, y = network_graph.layout_provider.graph_layout[n]
+        xs.append(float(x))
+        ys.append(float(y))
+        graph_layout[n] = [xs[-1], ys[-1]]
+
+    node_data['x'] = xs
+    node_data['y'] = ys
+    return {
+            'node_data': node_data ,
+            'edge_data': network_graph.edge_renderer.data_source.data,
+            'graph_layout': graph_layout
+            }
+

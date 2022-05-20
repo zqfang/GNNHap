@@ -5,6 +5,7 @@
     "PYTHON": "/home/fangzq/miniconda/envs/fastai/bin/python",
     "GNNHAP": "/home/fangzq/github/GNNHap",
     "GNNHAP_BUNDLE": "/data/bases/fangzq/Pubmed/bundle",
+    "GENE_MESH_GRAPH": "/data/bases/fangzq/Pubmed/bundle/human_gene_mesh_hetero_nx_bokeh.gpkl",
     "SNAKEMAKE": "/home/fangzq/miniconda/bin/snakemake",
     "MOUSE_SYMBOL2ENTREZ": "/data/bases/fangzq/Pubmed/mouse_gene2entrezid.json"
 }
