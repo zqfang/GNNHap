@@ -52,7 +52,7 @@ class Graph:
         ]
         #Create a plot — set dimensions, toolbar, and title
         plot = figure(tooltips = HOVER_TOOLTIPS, frame_width=550, frame_height=450,
-                    #output_backend="svg", #"webgl",  
+                    output_backend="svg", #"webgl",  
                     tools="pan,wheel_zoom,save,reset", 
                     active_scroll='wheel_zoom',
                     x_range=Range1d(-10.1, 10.1),
@@ -62,7 +62,10 @@ class Graph:
                     toolbar_location="above",
                     title="Gene-MeSH 1-hop Subgraph")
         plot.toolbar.logo = None
-
+        plot.grid.visible = False 
+        ## or remove grid by
+        # plot.xgrid.grid_line_color = None
+        # plot.ygrid.grid_line_color = None
         graph = GraphRenderer()
         #Set node sizes and colors according to node degree (color as category from attribute)
         graph.node_renderer.glyph = Scatter(size=size_by_this_attribute, 
@@ -153,7 +156,6 @@ class GNNHapResults(Graph):
         global gene_expr_order
         global mesh_terms
         global codon_flag
-        print(dataset)
         # update new data
         df, headers = load_ghmap(os.path.join(self.DATA_DIR, dataset))
         df = df[df.CodonFlag>=0]
