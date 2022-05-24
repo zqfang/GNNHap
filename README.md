@@ -2,6 +2,11 @@
 Graph Neural Network based Haplotype Prioritization for inbred mouse.
 
 
+### Citation
+```
+Zhuoqing Fang, Gary Peltz, An Automated Multi-Modal Graph-Based Pipeline for Mouse Genetic Discovery, Bioinformatics, 2022;, btac356, https://doi.org/10.1093/bioinformatics/btac356
+```
+
 ![GNNHap](./GNNHap.jpg)
 
 ## Installation
