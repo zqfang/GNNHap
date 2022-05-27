@@ -277,7 +277,7 @@ def get_common_neigbhor_subgraph(H, entrezid, meshid):
         pmids = sg.get_edge_data(entrezid, meshid, key=0)['edge_PMIDs']
     # pos = nx.layout.spring_layout(sx, k=5)
     degrees = dict(nx.degree(sg))
-    nx.set_node_attributes(sg, name='degree', values=degrees)
+    nx.set_node_attributes(sg, name='node_degree', values=degrees)
     adjusted_node_size = dict([(node, int(np.clip(degree, a_max=100, a_min=10))) for node, degree in degrees.items()])
     nx.set_node_attributes(sg, name='node_size_adjust', values=adjusted_node_size)
     #Create a network graph object

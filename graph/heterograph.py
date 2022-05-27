@@ -211,9 +211,13 @@ if __name__ == "__main__":
             del gnode['_protein_merge']
         H.add_node(gid, node_type='gene', node_label='gene', 
                 node_cat=['gene'], 
+                node_name=gnode['gene_symbol'],
                 node_weight=len(gnode['PMIDs']),
                 node_gene_symbol=gnode['gene_symbol'], 
-                node_entrez_id=gid)
+                node_entrez_id=gid,
+                node_type_color = '#fc8d59',
+                node_marker = "circle",
+                bipartite = 0)
         genes.append(gid)
         
     for mid, mnode in graph.mesh_nodes.items():
@@ -224,13 +228,19 @@ if __name__ == "__main__":
                 #node_ui=mnode['DescriptorUI'],
                 node_mesh_id = mid,
                 node_weight = len(mnode['PMIDs']),
-                node_descriptor_class=mnode['DescriptorClass'], ) 
+                node_descriptor_class=mnode['DescriptorClass'],
+                node_type_color= '#99d594',
+                node_marker = "triangle",
+                bipartite = 1 ) 
 
     # add gene-mesh edge
     for edge in graph.edges:
         s =str(edge['gene_node'])
         t = str(edge['mesh_node'])
-        H.add_edge(s, t,  edge_type='genemesh', edge_weight=edge['weight'], edge_PMIDs = edge['PMIDs'])
+        H.add_edge(s, t,  edge_type='genemesh', 
+                         edge_weight=edge['weight'], 
+                         edge_PMIDs = list(edge['PMIDs']),
+                         edge_weight_adjust = int(np.clip(edge['weight'], a_min=1, a_max=10)))
 
     # save tmp file
     # nx.write_gpickle(H, path="human_gene_mesh_hetero_nx.tmp.gpkl")
@@ -242,14 +252,14 @@ if __name__ == "__main__":
     for edge_idx, (head, tail, edge_dict) in enumerate(ppnet.PPI.edges(data=True)):
         head = str(head)
         tail = str(tail)
-        H.add_edge(head, tail, edge_type='ppi')
+        H.add_edge(head, tail, edge_type='ppi', edge_weight_adjust = 1) 
     print("Build MESH DAG")
     meshdag = MeshDAG(graph.mesh_nodes)
     mesh_graph = meshdag(outfile=OUT_MESH_GRAPH) # return a dataframe
     print("Add MESH Edges")
     for i, e in mesh_graph.iterrows():
         s, r, t = e
-        H.add_edge(s, t, edge_type=r, key=r)
+        H.add_edge(s, t, edge_type=r, key=r, edge_weight_adjust = 1)
     # check isolated nodes, and remove them
     isonodes = list(nx.isolates(H))
     # remove isolated nodes
