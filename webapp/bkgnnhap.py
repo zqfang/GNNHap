@@ -746,7 +746,7 @@ class SubGraph(Graph):
         self.gene = AutocompleteInput(completions=sorted(genes), #value="MPD_26711-f_Indel",width=550,
                                 title="Human Gene Symbol:", value="SIRT1", width=300,)
         self.meshid = AutocompleteInput(completions=sorted(mesh), #value="MPD_26711-f_Indel",width=550,
-                                title="MeSH Terms:", value="Hearing Loss", width=300,)
+                                title="MeSH Terms:", value="Hearing Disorder", width=300,)
         # message box
         self.message = Div(text="""<h3> PMIDs: <br> </h3>""", width=300, height=200)
         ## init gene mesh graph
