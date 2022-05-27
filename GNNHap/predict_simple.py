@@ -23,7 +23,7 @@ def add_train_args():
     parser.add_argument("--input", type=str, required=True, help="Output file name") 
     parser.add_argument("--output", type=str, required=True, help="Output file name") 
     parser.add_argument("--bundle", default=None, type=str, help="Path to the directory name of the required files (for predition task)")
-    parser.add_argument("--species", default='human', type=str, choices=('human','mouse'), help="the orangism for input gene names. choice from {human, mouse} ")
+    parser.add_argument("--species", default='mouse', type=str, choices=('human','mouse'), help="the orangism for input gene names. choice from {human, mouse} ")
     parser.add_argument("--gene_mesh_graph", type=str, default=None, help="genemesh.data.pkl object or genemesh.gpkl object")
     parser.add_argument("--gene_embed", default=None, type=str, help="gene_embedding file")
     parser.add_argument("--mesh_embed", default=None, type=str, help="mesh_embedding file")
@@ -49,11 +49,11 @@ BUNDLE_PATH = args.bundle
 HBCGM_RESULTS = args.input
 
 
-model_weight = os.path.join(BUNDLE_PATH, "gnn_64_epoch0.pt")
+model_weight = os.path.join(BUNDLE_PATH, "gnn_64_epoch005.pt")
 genemesh_data = os.path.join(BUNDLE_PATH, "genemesh.data.pkl") # genemesh.data.pkl
 
 mouse_human_namedict = None
-if args.species == 'mouse':
+if args.species.lower() == 'mouse':
     mouse_human_namedict = os.path.join(BUNDLE_PATH, "mouse2human.genenames.json")
 
 if not os.path.exists(model_weight):
@@ -170,7 +170,10 @@ class Simple:
         self.result.loc[self.result.index, 'MeSH_Terms'] = self.result['MeSH'].apply(lambda m: self.mesh_nodes[m]['DescriptorName'])
         self.result.loc[self.result.index, 'PubMedID'] = self.result.apply(self.get_pubmed_id, axis=1)
         outcols = self._columns + ['HumanEntrezID','MeSH_Terms','LiteratureScore','PubMedID']
-        self.result.loc[:, outcols].to_csv(output, sep="\t", index=False)
+        tmp = self.result.loc[:, outcols]
+        # rename column name, to compatible with webapp
+        tmp.rename(columns = {self._columns[0]:'#GeneName', self._columns[1]: 'MeSH'}, inplace = True)
+        tmp.to_csv(output, sep="\t", index=False)
 
     def map2human(self, result):
         if isinstance(result, pd.DataFrame):
@@ -195,8 +198,6 @@ class Simple:
         df = case.dropna(subset=['HumanEntrezID','GNodeIDX'])
         df.loc[df.index, 'GNodeIDX'] = df['GNodeIDX'].astype(int)
         df.loc[df.index, 'MNodeIDX'] = df['MNodeIDX'].astype(int)
-        # rename column name, to compatible with webapp
-        df.rename(columns = {g:'#GeneName', m: 'MeSH'}, inplace = True)
         return df
     
 

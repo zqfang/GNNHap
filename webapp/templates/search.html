@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
 
-<title>GNNHap Data Visualization</title>
+<title>Network Visualization</title>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"> </script>
   <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.1/jquery-ui.min.js"></script>
   <!-- <script src="https://cdn.bokeh.org/bokeh/release/bokeh-mathjax-2.4.2.min.js" crossorigin="anonymous"></script> -->
@@ -23,6 +23,7 @@
   {{ plot_script|safe }}
 </head>
 
+
 <body>
   <nav>
     <a class="navbar" href="{{ url_for('index') }}">Home</a>
@@ -36,17 +37,19 @@
     <p>GNNHap is an AI-driven genetic discovery program for Inbred mice. </p>
     <h2> Usage </h2>
     <ol> 
-      <li>Input a new dataset name in the TextInputBox to update everything in this page</li>
-      <li>Select MeSH term to get literature score</li>
-      <li>Click DataTable row to highlight a gene</li>
-      <li>Click DataTable header to sort a column. Clicking one more time changes sort direction. <br>
-        Use Shift + click to sort multiple columns simultaneously. <br>
-        Use Ctrl + click to return to natural order.</li>
+      <li>Input a new gene name (Human Gene Symbol) in the TextInputBox to update everything in this page</li>
+      <li>Input a new MeSH term in the TextInputBox to update everything in this page</li>
       <li>Save DataTable by click download button.</li>
       <li>Save Figures by click save widget below the plots.</li>
     </ol> 
 
     <h2> Results </h2>
+    <p><b>Note</b>: 
+      <ol>
+        <li>Input value only accept auto suggested ones. Other input won't have any updates on the network</li>
+        <li>If there's no paper links show up, it means the input Gene and MeSH Have <b>NOT</b> direct links </li>
+
+      </ol></p>
     <div>{{ plot_div|safe }}</div>
 
 

@@ -20,6 +20,7 @@
     <a class="navbar" href="{{ url_for('index') }}">Home</a>
     <a class="navbar" href="{{ url_for('results') }}">Results</a>
     <a class="navbar" href="{{ url_for('graph') }}">Graph</a>
+    <a class="navbar" href="{{ url_for('search') }}">Search</a>
     <a class="navbar" href="{{ url_for('about') }}">About</a>
   </nav>
   <div class="content">
@@ -32,10 +33,10 @@
         <!-- <form method="post" id="inp"> -->
         <div style="text-align: left; width:350px;">
         <h2>1: Run GNNHap prediction</h2>
-        <h3>Predition needs two input</h3>
+        <h3>The analysis required two types of input (entered below)</h3>
         <ol>
-          <li>MeSH term ID, e.g. D003337</li>
-          <li>A list of genes to prioritize</li>
+          <li>MeSH term ID number (e.g. D003337)</li>
+          <li>A list of genes for prioritization (entered as gene symbols)</li>
         </ol>
         <p>Pleae input MeSH term ID and gene names below</p>
         <button type="submit" name="bt" value="geneSubmit">Submit</button>
@@ -49,7 +50,7 @@
                   cols="30"
                   >{{ request.form["mesh_term"] }}</textarea><br>
         
-        <p>Input a list of genenames </p>
+        <p>Input a list of gene symbols </p>
         <label for="genename">Gene Symbol</label> <br>
         <textarea name="gene_symbol"
                   placeholder="Draxin"
@@ -75,7 +76,10 @@
             <!-- <pre id="dataContent"></pre> -->
             <!-- <button type="submit" name="btn" value="fileSubmit">Submit</button> -->
             <!-- </form> -->
-          <p><b>Note:</b>Only support txt, csv, xls, xlsx. An example file looks like this
+          <p><b>Note:</b>Only txt, csv formats are supported. 
+            A file should have the abbreviation name of strain as the first column,
+            and phenotypic value as the second column. <br>
+            An example file looks like this
           <pre>
             <code>
               129P2 123
@@ -86,7 +90,8 @@
           </p>
 
           <h4> Option 2: Input measuments mannually</h4>
-          <p><b>Note:</b> Only accept numeric values. Leave a strain to be blank if there's phenotypic data </p>
+          <p><b>Note:</b> Only numeric values accepted. Enter the data for the strains that were evaluated. <br>
+            If there is no phenotypic data for a strain, leave the box for that strain as a blank </p>
           {% for abbr, full in strains.items() %}
           <label for="{{ abbr }}">{{ full }}</label>
           <input type="number"

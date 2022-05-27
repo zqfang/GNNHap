@@ -52,6 +52,12 @@ p {
     text-align: justify;
     text-justify: inter-word;
 }
+
+pre {
+    white-space: pre-wrap;
+    word-break: keep-all
+}
+
 table {
     width: 50%;
   }

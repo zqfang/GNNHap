@@ -1,3 +1,5 @@
+from curses import keyname
+from email.policy import default
 import glob, os, json
 import numpy as np
 import pandas as pd
@@ -270,6 +272,9 @@ def symbol_check(symbols):
 def get_common_neigbhor_subgraph(H, entrezid, meshid):
     neighbors = list(nx.common_neighbors(H, entrezid, meshid )) + [entrezid, meshid]
     sg = nx.subgraph(H, neighbors).copy()
+    pmids = ['Indirect']
+    if sg.has_edge(entrezid, meshid):
+        pmids = sg.get_edge_data(entrezid, meshid, key=0)['edge_PMIDs']
     # pos = nx.layout.spring_layout(sx, k=5)
     degrees = dict(nx.degree(sg))
     nx.set_node_attributes(sg, name='degree', values=degrees)
@@ -291,8 +296,9 @@ def get_common_neigbhor_subgraph(H, entrezid, meshid):
     node_data['x'] = xs
     node_data['y'] = ys
     return {
-            'node_data': node_data ,
-            'edge_data': network_graph.edge_renderer.data_source.data,
-            'graph_layout': graph_layout
+            'node_data': dict(node_data) ,
+            'edge_data': dict(network_graph.edge_renderer.data_source.data),
+            'graph_layout': graph_layout,
+            'pmid': pmids
             }
 

@@ -1,4 +1,5 @@
 
+from ast import Sub
 import os, uuid, subprocess, re, json, tempfile
 import numpy as np
 import pandas as pd
@@ -8,7 +9,7 @@ from werkzeug.utils import secure_filename
 from bokeh.embed import components
 from bokeh.resources import INLINE
 
-from bkgnnhap import GNNHapResults, GNNHapGraph
+from bkgnnhap import GNNHapResults, GNNHapGraph, SubGraph
 from helpers import STRAINS, read_trait, get_data, symbol_check, get_common_neigbhor_subgraph, get_html_links
 # from bokeh.palettes import Spectral8
 
@@ -170,7 +171,8 @@ def run_gnnhap_predict(gene_symbol, mesh_terms, dataset=None):
 
 @app.route('/results')
 def results():
-    gnnhap = GNNHapResults(data_dir = app.config['HBCGM_DIR'], dataset=None)
+    graph_data_dict = get_common_neigbhor_subgraph(GENE_MESH_GRAPH, "23411", "D006311")
+    gnnhap = GNNHapResults(data_dir = app.config['HBCGM_DIR'], dataset=None, graph_data_dict=graph_data_dict)
     layout = gnnhap.build()
     # grab the static resources
     js_resources = INLINE.render_js()
@@ -243,7 +245,8 @@ def graph():
     """
     read dataset and render page when open url "/graph". This page could select all datasets that avaible to show
     """
-    g = GNNHapGraph(data_dir=app.config['GRAPH_DIR'], dataset=None, graph_data_dict=None)
+    graph_data_dict = get_common_neigbhor_subgraph(GENE_MESH_GRAPH, "23411", "D006311")
+    g = GNNHapGraph(data_dir=app.config['GRAPH_DIR'], dataset=None, graph_data_dict=graph_data_dict)
     layout = g.build_graph()
     js_resources = INLINE.render_js()
     css_resources = INLINE.render_css()
@@ -251,6 +254,28 @@ def graph():
     script, div = components(layout)
     html = render_template(
         'result.html',
+        plot_script=script,
+        plot_div=div,
+        js_resources=js_resources,
+        css_resources=css_resources,
+    ).encode(encoding='UTF-8')
+    return html
+
+
+@app.route('/search')
+def search():
+    """
+    read dataset and render page when open url "/search". This page could select all datasets that avaible to show
+    """
+    graph_data_dict = get_common_neigbhor_subgraph(GENE_MESH_GRAPH, "23411", "D006311")
+    g = SubGraph(GENE_MESH_GRAPH, graph_data_dict=graph_data_dict)
+    layout = g.build_graph()
+    js_resources = INLINE.render_js()
+    css_resources = INLINE.render_css()
+    # render template
+    script, div = components(layout)
+    html = render_template(
+        'search.html',
         plot_script=script,
         plot_div=div,
         js_resources=js_resources,
@@ -349,5 +374,6 @@ def graph_process(gene, meshid):
 
 if __name__ == '__main__':
     app.run(debug=False, 
-            host="0.0.0.0", 
+            host="peltz-app-03",
+            #host="0.0.0.0", 
             port=5006)

@@ -35,7 +35,7 @@ HBCGM_RESULTS = args.hbcgm_result_dir
 MESH_TERMS = args.mesh_terms
 
 os.makedirs(args.outdir, exist_ok=True)
-model_weight = os.path.join(BUNDLE_PATH, "gnn_64_epoch0.pt")
+model_weight = os.path.join(BUNDLE_PATH, "gnn_64_epoch005.pt")
 genemesh_data = os.path.join(BUNDLE_PATH, "genemesh.data.pkl") # genemesh.data.pkl
 mouse_human_namedict = os.path.join(BUNDLE_PATH, "mouse2human.genenames.json")
 mus_tissue_exp = os.path.join(BUNDLE_PATH, "mus.compact.exprs.organs.order.txt")

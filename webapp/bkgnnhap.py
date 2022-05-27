@@ -31,7 +31,7 @@ class Graph:
         else:
             self.graph.node_renderer.data_source.data =  graph_data_dict['node_data']
             self.graph.edge_renderer.data_source.data =  graph_data_dict['edge_data']
-            self.graph.layout_provider.graph_layout =  graph_data_dict['graph_layout']
+            self.graph.layout_provider =  StaticLayoutProvider(graph_layout=graph_data_dict['graph_layout'])
     def _graph(self):
         """
         build graph components
@@ -144,7 +144,7 @@ class GNNHapResults(Graph):
     """
     visualitzation of GNNHap results
     """
-    def __init__(self, data_dir, dataset=None):
+    def __init__(self, data_dir, dataset=None, graph_data_dict=None):
         ### setup data and plots
         ## data
         DATASETS = glob.glob(data_dir+"**/*.results.mesh.txt")
@@ -206,7 +206,6 @@ class GNNHapResults(Graph):
         self.button = Button(label="Download Table", button_type="success")
         self.barplot()
         self.scatterplot()
-        graph_data_dict=None
         super(GNNHapResults, self).__init__(graph_data_dict=graph_data_dict)
         # self.data_update(dataset)
     ## bar plot
@@ -470,13 +469,8 @@ class GNNHapResults(Graph):
                 graph.edge_renderer.data_source.data = data['edge_data'];
                 graph.layout_provider.graph_layout = data['graph_layout'];
               });
-            source.change.emit();
             graph.change.emit();
             genemeshplot.change.emit();
-
-
-
-
             source.change.emit();
             bar.change.emit();
         """))
@@ -552,7 +546,6 @@ class GNNHapResults(Graph):
 
         return layout
 
-# dataset id
 class GNNHapGraph(Graph):
     def __init__(self, data_dir, dataset=None, graph_data_dict=None):
         ### setup data and plots
@@ -569,6 +562,8 @@ class GNNHapGraph(Graph):
         self.source = ColumnDataSource(df)
         self.dataset = AutocompleteInput(completions=DATASETS2, #value="MPD_26711-f_Indel",width=550,
                                 title="Dataset:", value=dataset, width=550,)
+        # self.gene = AutocompleteInput(completions=DATASETS2, #value="MPD_26711-f_Indel",width=550,
+        #                         title="Dataset:", value=dataset, width=550,)
         # mesh terms options
         self.meshid = Select(title="Select MeSH:", value="", 
                              options=df['MeSH_Terms'].unique().tolist(), width=300,) # need to update dynamically
@@ -669,7 +664,7 @@ class GNNHapGraph(Graph):
                                 """))
 
     ### setup callbacks
-    def gene_update(self): # attr, old, new
+    def table_gene_update(self): # attr, old, new
         self.source.selected.js_on_change('indices', CustomJS(args=dict(source=self.source, 
                                                               message = self.message,
                                                               graph=self.graph,
@@ -712,7 +707,7 @@ class GNNHapGraph(Graph):
         self.data_update()
         self.mesh_update()
         self.slider_update()
-        self.gene_update()
+        self.table_gene_update()
         self.button.js_on_click(CustomJS(args=dict(source=self.myTable.source, 
                                                    dataset=self.dataset.value),
                                     code=open(os.path.join(os.path.dirname(__file__), "static/js/download.js")).read()))
@@ -728,3 +723,110 @@ class GNNHapGraph(Graph):
         return layout
 
     
+
+class SubGraph(Graph):
+    def __init__(self, gene_mesh_graph, graph_data_dict=None):
+        """
+        gene_mesh_graph: networkx graph 
+        """
+        ### setup data and plots
+        ## data
+        self.gene_mesh_graph = gene_mesh_graph
+        self.nid2name = {}
+        self.nname2id = {}
+        genes = []
+        mesh = []
+        for node,node_attr in gene_mesh_graph.nodes(data=True):
+            self.nname2id[node_attr['node_name']] = [node]
+            if node.startswith("D"):
+                mesh.append(node_attr['node_name'])
+            else:
+                genes.append(node_attr['node_name'])
+        self.source_name2id = ColumnDataSource(data=self.nname2id)
+        self.gene = AutocompleteInput(completions=sorted(genes), #value="MPD_26711-f_Indel",width=550,
+                                title="Human Gene Symbol:", value="SIRT1", width=300,)
+        self.meshid = AutocompleteInput(completions=sorted(mesh), #value="MPD_26711-f_Indel",width=550,
+                                title="MeSH Terms:", value="Hearing Loss", width=300,)
+        # message box
+        self.message = Div(text="""<h3> PMIDs: <br> </h3>""", width=300, height=200)
+        ## init gene mesh graph
+        super(SubGraph,self).__init__(graph_data_dict)        
+    def mesh_update(self):
+        self.meshid.js_on_change('value', CustomJS(args=dict(gene=self.gene, 
+                                graph=self.graph,
+                                name2id = self.source_name2id,
+                                genemeshplot=self.graphplot,
+                                message = self.message,
+                                ), 
+                                code="""
+            const mesh_name = cb_obj.value;
+            const mesh_id = name2id.data[mesh_name][0];
+            var gene_name = gene.value;
+            var gene_id = name2id.data[gene_name][0];
+            // get json data
+            $.getJSON(`/graph_process/${gene_id}_${mesh_id}`,
+              function(data) {
+                // update graph data here
+                graph.node_renderer.data_source.data = data['node_data'];
+                graph.edge_renderer.data_source.data = data['edge_data'];
+                graph.layout_provider.graph_layout = data['graph_layout'];
+
+                const papers = data['pmid'];
+                //console.log(pid);
+                var pid_html = [];
+                for (var j=0; j < papers.length; j++)
+                {
+                    var pa = papers[j];
+                    if (pa == "Indirect") continue;
+                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator/index.html?view=docsum&query=${pa}" target="_blank">${pa}</a>`;
+                    pid_html.push(ps);
+                }
+                message.text = "<div><h3>PubMed Links:</h3><pre>" + pid_html.join(",") +"</pre></div>" ;
+              });
+            graph.change.emit();
+            genemeshplot.change.emit();
+                                """))
+    def gene_update(self):
+        self.gene.js_on_change('value', CustomJS(args=dict(mesh=self.meshid, 
+                                graph=self.graph,
+                                name2id = self.source_name2id,
+                                genemeshplot=self.graphplot,
+                                message = self.message,
+                                ), 
+                                code="""
+            const gene_name = cb_obj.value;
+            const mesh_name = mesh.value;
+            const mesh_id = name2id.data[mesh_name][0];
+            var gene_id = name2id.data[gene_name][0];
+            // get json data
+            $.getJSON(`/graph_process/${gene_id}_${mesh_id}`,
+              function(data) {
+                // update graph data here
+                graph.node_renderer.data_source.data = data['node_data'];
+                graph.edge_renderer.data_source.data = data['edge_data'];
+                graph.layout_provider.graph_layout = data['graph_layout'];
+                const papers = data['pmid'];
+                //console.log(pid);
+                var pid_html = [];
+                for (var j=0; j < papers.length; j++)
+                {
+                    var pa = papers[j];
+                    if (pa == "Indirect") continue;
+                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator/index.html?view=docsum&query=${pa}" target="_blank">${pa}</a>`;
+                    pid_html.push(ps);
+                }
+                message.text = "<div><h3>PubMed Links:</h3><pre>" + pid_html.join(",") +"</pre></div>" ;
+              });
+            graph.change.emit();
+            genemeshplot.change.emit();
+                                """))
+
+    def build_graph(self):
+        # datatable
+        self.mesh_update()
+        self.gene_update()
+        ## set up layout
+        o = row(self.meshid, self.gene)
+        o1 = row(self.graphplot, self.message)
+        inputs = column(o, o1)
+        return inputs
