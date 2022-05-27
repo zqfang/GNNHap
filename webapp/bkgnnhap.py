@@ -746,7 +746,7 @@ class SubGraph(Graph):
         self.gene = AutocompleteInput(completions=sorted(genes), #value="MPD_26711-f_Indel",width=550,
                                 title="Human Gene Symbol:", value="SIRT1", width=300,)
         self.meshid = AutocompleteInput(completions=sorted(mesh), #value="MPD_26711-f_Indel",width=550,
-                                title="MeSH Terms:", value="Hearing Disorder", width=300,)
+                                title="MeSH Terms:", value="Hearing Disorders", width=300,)
         # message box
         self.message = Div(text="""<h3> PMIDs: <br> </h3>""", width=300, height=200)
         ## init gene mesh graph
@@ -796,6 +796,7 @@ class SubGraph(Graph):
                                 code="""
             const gene_name = cb_obj.value;
             const mesh_name = mesh.value;
+            console.log(mesh_name);
             const mesh_id = name2id.data[mesh_name][0];
             var gene_id = name2id.data[gene_name][0];
             // get json data
