@@ -184,7 +184,7 @@ class GNNHapResults(Graph):
         # message box
         self.message = Div(text="""<h3> Gene Expression: </h3>""", width=300, height=150)
         # gene expression pattern
-        self.exprs = Div(text="""<h3> Gene Expressed in: </h3>""", width=300, height=800)
+        self.haploblock = Div(text="""<h3> Selected Haplotypeblock: </h3>""", width=300, height=800)
 
         self.slider = RangeSlider(title="LitScore Range", start=0.0, end=1.0, value=(0.5, 1.0), step=0.01)
         # data view
@@ -194,12 +194,12 @@ class GNNHapResults(Graph):
 
         ## Datatable
         columns = ['GeneName', 'CodonFlag','Haplotype','EffectSize', 'Pvalue', 'FDR',
-                'PopPvalue', 'PopFDR', 'Chr', 'ChrStart', 'ChrEnd', 'LitScore','PubMed'] 
+                'PopPvalue', 'PopFDR', 'Position', 'LitScore','PubMed'] # 'Chr', 'ChrStart', 'ChrEnd'
         columns = [ TableColumn(field=c, title=c, formatter=HTMLTemplateFormatter() 
-                                if c in ['Haplotype','GeneName', 'PubMed'] else CellFormatter()) for c in columns ] # skip index  
+                                if c in ['Haplotype','GeneName', 'PubMed', 'Position'] else CellFormatter()) for c in columns ] # skip index  
         self.columns = columns                     
         self.myTable = DataTable(source=self.source, columns=columns, width =1200, height = 400, index_position=0,
-                            editable = False, view=self.view, name="DataTable",sizing_mode="stretch_width") # autosize_mode="fit_viewport"
+                            editable = True, view=self.view, name="DataTable",sizing_mode="stretch_width") # autosize_mode="fit_viewport"
         
 
         # download
@@ -208,6 +208,25 @@ class GNNHapResults(Graph):
         self.scatterplot()
         super(GNNHapResults, self).__init__(graph_data_dict=graph_data_dict)
         # self.data_update(dataset)
+
+    def _haploblock(self,):
+        _header = [f"<th>{s}</th>" for s in self.source_bar.data['strain']]
+        _header = "<thead><tr>" + "".join(_header) + "</tr></thead>"
+        
+        _message = """
+          <tbody>
+            {% for k, v in trait_data.items() %}
+              <tr>
+                  <td>{{ k }}</td>
+                  <td>{{ strains[k] }}</td>
+                  <td> {{ v }}</td>
+              </tr>
+              {% endfor %}
+          </tbody>
+        </table>
+        """
+        table = "<table>" + _header + _message +"</table"
+
     ## bar plot
     def barplot(self,):
         bar = figure(plot_width=600, plot_height=300, # x_range=strains, 
@@ -403,7 +422,7 @@ class GNNHapResults(Graph):
                                                               message = self.message,
                                                               mesh_terms= self.source_meshs,
                                                               meshid=self.meshid,
-                                                              expr = self.exprs,
+                                                              haploblock = self.haploblock,
                                                               codon=self.codon,
                                                               source_codon=self.source_codon,
                                                               graph=self.graph,

@@ -1,6 +1,6 @@
 from curses import keyname
 from email.policy import default
-import glob, os, json
+import glob, os, json, itertools
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from bokeh.palettes import Category10
 from bokeh.plotting import from_networkx
-
+from flask import request
 ## HELPERS
 STRAINS = {'129P2': '129P2/OlaHsd',
         '129S1': '129S1/SvImJ',
@@ -111,6 +111,15 @@ def get_html_links(genename):
         return html_string
     return genename
 
+def get_hblock_links(row, filename):
+    chrom = row['Chr']
+    bstart = row['BlockStart']
+    bsize = row['BlockSize']
+    pos = chrom + ":" + str(row['ChrStart']) +"-"+ str(row['ChrEnd'])
+    pattern = row['Pattern']
+    html_string = f'<a href="{request.url_root}haploblock/{filename}_{pos}_{bstart}_{bsize}_{pattern}" target="_blank">{pos}</a>'
+    return html_string
+
 def get_html_string(pattern):    
     html_string = ""  
     for r in list(pattern):
@@ -133,7 +142,7 @@ def load_ghmap(dataset):
     df['Pattern'] = df['Haplotype'].astype(str)
     df['Haplotype'] = df.Haplotype.apply(get_html_string)
     df['GeneName'] = df.GeneName.apply(get_html_links)
-    
+    df['Position'] = df.apply(get_hblock_links, args=(os.path.basename(dataset),),axis=1)
     # dataset_name, codon_flag, gene_expr_order, strains, traits, mesh_terms = headers[:6]
     headers[2] = headers[2][-1].split(";")
  
@@ -201,7 +210,7 @@ def get_data(dataset):
         print("No significant values loaded")
         return  
     columns = ['GeneName', 'CodonFlag','Haplotype','EffectSize', 'Pvalue', 'FDR',
-                'PopPvalue', 'PopFDR', 'Chr', 'ChrStart', 'ChrEnd', 'LitScore','PubMed'] 
+                'PopPvalue', 'PopFDR', 'Position', 'LitScore','PubMed'] 
     if df.columns.str.startswith("Pop").sum() == 0: 
         # kick out 'FDR', PopPvalue', 'PopFDR',
         _columns = [ columns[i] for i in range(len(columns)) if  i not in [5, 6, 7] ]   
@@ -210,7 +219,7 @@ def get_data(dataset):
     # update mesh, bar, scatter
     mesh_columns = [m for m in df.columns if m.startswith("MeSH_") ]
     if len(mesh_columns) == 0:
-        message = f"<p> Warning: <br> Dataset {uid} not load Mesh Score !</p>"
+        message = f"<p> Warning: <br> Dataset {dataset} not load Mesh Score !</p>"
         #_columns.pop(_columns.index("PubMed")) # kick out PubMed
         #_columns.pop(_columns.index('LitScore'))
         _columns.pop(-1)
@@ -237,17 +246,12 @@ def get_data(dataset):
 def read_trait(filename):
     # out = []
     suf = filename.lower().split(".")[-1]
-    # with open(filename, 'r') as inp:
-    #     for line in inp:
-    #         if line.startswith("#"): continue
-    #         line = line.strip().split()
-    #         out.append(out)
     if suf == "txt":
-        out = pd.read_table(filename, comment="#")
+        out = pd.read_table(filename, comment="#", index_col=0)
     elif suf == "csv":
-        out = pd.read_csv(filename, comment="#")
+        out = pd.read_csv(filename, comment="#", index_col=0)
     elif suf in ['xls','xlsx']:
-        out = pd.read_excel(filename, comment="#")
+        out = pd.read_excel(filename, comment="#", index_col=0)
     return out 
 
 def get_datasets(data_dir):
@@ -302,3 +306,83 @@ def get_common_neigbhor_subgraph(H, entrezid, meshid):
             'pmid': pmids
             }
 
+
+
+def snp_view(data_path, pattern=None, chrom=19, bstart=36449, bsize=5, strains=None):
+    """
+    show snp table view
+    Args:
+        data_path: haplotype file output of (eblocks -p)
+        pattern: haplotype block pattern 
+        chrom, bstart, bsize: haplotype block cooridnates
+        strains: strain names coresponse to pattern 
+ 
+    Return: tuple of  
+        table: html table of haplotypeblock
+        bed:  red file of haplotyepblock
+    """
+    # Retrieve the desired SNPs from the database file.
+    print(data_path)
+    if data_path is None:
+        data_path = "/data/bases/shared/haplomap/HBCGM_DATA/MPD_24412-f/chr19.indel.haplotypes.txt"
+    # haplob = pd.read_table(data_path, header=None, usecols=range(6))
+    #print(haplob)
+    start = int(bstart)
+    end = start + int(bsize)
+    table = """
+    <table cellspacing=3>
+    <thead>
+    <TR halign="center">
+    <TH valign="bottom">ID</TH><TH valign="bottom">Chr</TH><TH valign="bottom">Position</TH>
+    """
+
+    ## Read file block
+    assert start < end
+    fh = open(data_path, 'r')
+    snp_block = itertools.islice(fh, start, end)
+    rows = []
+    for line in snp_block:
+        rows.append(line.strip().split())
+
+    # add headings for each strain abbrev
+    _STRAINS = strains
+    if strains is None:
+        _STRAINS = rows[0][3]
+    for p, strain in zip(pattern, _STRAINS):
+        c = dict_color[p]
+        table +=f"<TH class=\"verticalTableHeader\" halign=\"left\" height=\"50\" valign=\"bottom\" style=\"background-color:{c}\"><span>{strain}</span></TH>"
+    table += "<TH valign=\"bottom\">Gene</TH><TH valign=\"bottom\">Annotation</TH></TR></thead><tbody><TR>"
+    
+    bed = [] # Chr, ChrStart, ChrEnd
+    for row in rows:
+        snpChr, snpPos, snpID, snpAlleles = row[:4]
+        snpID = snpID.rstrip("_")
+        table = table + f"<TD halign=\"center\" >{snpID}</TD>" +\
+                        f"<TD halign=\"center\" >{snpChr}</TD>" +\
+                        f"<TD halign=\"center\" >{snpPos}</TD>"
+        # write snp allelle
+        for a in snpAlleles: 
+            c = '#ffffff'
+            if a == '0':
+                c = '#dddcdd'
+            elif a == '1':
+                c = '#E77918'
+            table += f"<TD halign=\"center\" style=\"background-color:{c}\">{a}</TD>"
+        # print annotations
+        snpGene, snpGeneAnno = "", ""
+        if len(row) == 6:
+            snpGene, snpGeneAnno = row[4:6]
+        elif len(row) > 6:
+            snpGene = "<br>".join(row[slice(4, len(row), 2)])
+            snpGeneAnno = "<br>".join(row[slice(5, len(row), 2)])
+        table += f"<TD halign=\"center\" >{snpGene}</TD><TD halign=\"center\" >{snpGeneAnno}</TD></TR>\n"
+        snpEnd = int(snpPos) - 1
+        snpStart = snpEnd -1 
+        _bed = f"{snpChr}\t{snpStart}\t{snpEnd}\t"
+        if len(snpGene) > 0:
+            _bed += f"{snpGene};{snpGeneAnno}"
+        _bed += "\n"
+        bed.append(_bed)
+    table += "</tbody></table>\n"
+    fh.close()
+    return table, bed

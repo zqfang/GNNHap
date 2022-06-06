@@ -65,9 +65,14 @@ table {
 th {
     padding: 10px;
     text-align: left;
-    background-color: #04AA6D;
+    background-color: #a7aba8;
     color: white;
   }
+
+th span { writing-mode: sideways-lr; /* +90°: use 'tb-rl' */
+          text-align: left;          /* +90°: use 'right' */
+          // padding:10px 5px 0; 
+}
 
 td {
     padding: 10px;
@@ -76,7 +81,7 @@ td {
   }
 
 tr:nth-child(even) {background-color: #f2f2f2;}
-tr:hover {background-color: coral;}
+tr:hover {background-color: #C0D728;}
 
 .content {
     margin: 0em;
@@ -132,4 +137,3 @@ tr:hover {background-color: coral;}
     text-align: center;
     padding: 10px;
   }
-

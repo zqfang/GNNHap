@@ -1,6 +1,6 @@
 {
-    "HBCGM_DIR" : "/home/fangzq/github/GNNHap/webapp/HBCGM_DATA",
-    "GRAPH_DIR" : "/home/fangzq/github/GNNHap/webapp/GRAPH_DATA",
+    "HBCGM_DATA" : "/home/fangzq/github/GNNHap/webapp/HBCGM_DATA",
+    "GRAPH_DATA" : "/home/fangzq/github/GNNHap/webapp/GRAPH_DATA",
     "SECRET_KEY": "df0331cefc6c2b9a5d0208a726a5d1c0fd37324feba25506",
     "PYTHON": "/home/fangzq/miniconda/envs/fastai/bin/python",
     "GNNHAP": "/home/fangzq/github/GNNHap",

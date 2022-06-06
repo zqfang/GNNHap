@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+<title>GNNHap Data Visualization</title>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <!-- Custom Style -->
+  <script src="https://cdn.jsdelivr.net/npm/igv@2.12.6/dist/igv.min.js"></script>
+  <link href="{{ url_for('static',filename='css/custom.min.css') }}" rel="stylesheet">
+  
+  {% block javascript %}
+  <script>
+  function haploIGVinit() 
+  {
+      var igvDiv = document.getElementById("igv-div");
+      var options =
+          {
+              genome: "mm10",
+              locus: "{{ position }}",
+              tracks: [
+                  {
+                      "name": "Haplotype Block",
+                      "url": "{{ roi | safe }}",
+                      "format": "bed",
+                      "color": "#CE3D32FF"
+                  }
+              ],
+              // Define "region of interest" sets
+              roi: [
+                  {
+                      "name": 'Variant Locations',
+                      "url": "{{ roi | safe }}",
+                      "indexed": false,
+                      "color": "rgba(68, 134, 247, 0.25)"
+                  }]
+        }
+  
+        igv.createBrowser(igvDiv, options).then(function (browser) {
+                      console.log("Created IGV browser");})
+  }
+  </script>
+  {% endblock %}
+
+</head>
+
+
+<body onload="haploIGVinit()">
+  <nav>
+    <a class="navbar" href="{{ url_for('index') }}">Home</a>
+    <a class="navbar" href="{{ url_for('results') }}">Results</a>
+    <a class="navbar" href="{{ url_for('haplotype') }}">Haplotype</a>
+    <a class="navbar" href="{{ url_for('graph') }}">Graph</a>
+    <a class="navbar" href="{{ url_for('search') }}">Search</a>
+    <a class="navbar" href="{{ url_for('about') }}">About</a>
+  </nav>
+  <div class="content">
+    <h1>Welcome to GNNHap Data Visualization Server </h1>
+    <p>GNNHap is an AI-driven genetic discovery program for Inbred mice. </p>
+    <h2> Selected Haplotype Block View </h2>
+    <h3>Genome View </h3>
+    <div id="igv-div">Snapshot: {{ position }} . Varaints are highlighed acording to the genomic locatoin</div>
+    <h3>SNP View</h3>
+    <p> <b>Note</b>: Strain order is the same to the selected haplotype. Reference: <strong>0</strong>, Alternate: <strong>1</strong>, Unknown: <strong>?</strong></p>
+    <p>Haplotype of each strain is represented by the color of table header</p>
+    <div id="haplotype-tab"> {{ snp_view | safe }}</div> 
+  </div>
+</body>
+</html>

@@ -10,20 +10,20 @@ from bokeh.embed import components
 from bokeh.resources import INLINE
 
 from bkgnnhap import GNNHapResults, GNNHapGraph, SubGraph
-from helpers import STRAINS, read_trait, get_data, symbol_check, get_common_neigbhor_subgraph, get_html_links
+from helpers import STRAINS, read_trait, get_data, symbol_check, get_common_neigbhor_subgraph, get_html_links, snp_view
 # from bokeh.palettes import Spectral8
 
 app = Flask(__name__)
 
 app.config.from_file("config.json", load=json.load)
-# app.config['HBCGM_DIR'] = "/home/fangzq/github/GNNHap/webapp/HBCGM_DATA"
-# app.config['GRAPH_DIR'] = "/home/fangzq/github/GNNHap/webapp/GRAPH_DATA"
+# app.config['HBCGM_DATA'] = "/home/fangzq/github/GNNHap/webapp/HBCGM_DATA"
+# app.config['GRAPH_DATA'] = "/home/fangzq/github/GNNHap/webapp/GRAPH_DATA"
 # app.config['SECRET_KEY'] = 'df0331cefc6c2b9a5d0208a726a5d1c0fd37324feba25506' # os.urandom(24).hex()
 TRAIT_DATA = {}
 MESH_TERM = ""
 GENE_SYMBOL = ""
-GENE_MESH_GRAPH = nx.read_gpickle(app.config['GENE_MESH_GRAPH'])
-
+#GENE_MESH_GRAPH = nx.read_gpickle(app.config['GENE_MESH_GRAPH'])
+GENE_MESH_GRAPH = ""
 
 @app.route('/', methods=['GET', 'POST'])
 def index(): 
@@ -105,7 +105,7 @@ def background_process():
     if (len(GENE_SYMBOL) > 1) and (len(MESH_TERM) > 1) and (len(TRAIT_DATA) < 1):
         ret, cmd = run_gnnhap_predict(gene_symbol=GENE_SYMBOL, 
                                       mesh_terms=MESH_TERM, 
-                                      dataset=os.path.join(app.config['GRAPH_DIR'], uid))
+                                      dataset=os.path.join(app.config['GRAPH_DATA'], uid))
         print(ret.stdout)
         return jsonify({"uuid": uid, 
                          "cmd": cmd, 
@@ -123,7 +123,7 @@ def background_process():
     strain = ",".join(strain)
     pheno = ",".join(trait)
 
-    wkdir= os.path.join(app.config['HBCGM_DIR'], uid)
+    wkdir= os.path.join(app.config['HBCGM_DATA'], uid)
     cmd = f"""{app.config["SNAKEMAKE"]} -s {app.config["GNNHAP"]}/webapp/gnnhap.smk \
               --rerun-incomplete -p -j 32 \
               --configfile {app.config["GNNHAP"]}/webapp/config.yaml \
@@ -172,7 +172,7 @@ def run_gnnhap_predict(gene_symbol, mesh_terms, dataset=None):
 @app.route('/results')
 def results():
     graph_data_dict = get_common_neigbhor_subgraph(GENE_MESH_GRAPH, "23411", "D006311")
-    gnnhap = GNNHapResults(data_dir = app.config['HBCGM_DIR'], dataset=None, graph_data_dict=graph_data_dict)
+    gnnhap = GNNHapResults(data_dir = app.config['HBCGM_DATA'], dataset=None, graph_data_dict=graph_data_dict)
     layout = gnnhap.build()
     # grab the static resources
     js_resources = INLINE.render_js()
@@ -198,17 +198,17 @@ def results_uid(uid):
     #if not uid.startswith("MPD_"): uid2 = "MPD_"+uid
     # if not uid.endswith("")
     dataset = None
-    data_dir = os.path.join(app.config['HBCGM_DIR'], uid)
+    data_dir = os.path.join(app.config['HBCGM_DATA'], uid)
     # pat = re.compile("MPD_(.+)_([indel|snp]).results.mesh.txt")
     ## must have HBCGM_DATA directory
     if uid.startswith("MPD") and uid.endswith(".results.mesh.txt"):
         # if pat.search(uid):
         #     _uid = pat.search(uid).groups()[0]
         #     print(_uid)
-        #     data_dir = os.path.join(app.config['HBCGM_DIR'], _uid)
+        #     data_dir = os.path.join(app.config['HBCGM_DATA'], _uid)
         _uid = uid.split("_")[1]
         dataset = uid
-        data_dir = os.path.join(app.config['HBCGM_DIR'], _uid)
+        data_dir = os.path.join(app.config['HBCGM_DATA'], _uid)
         """
         return json file for same page render
         """
@@ -237,7 +237,7 @@ def hbcgm_uid(uid):
     background process url.
     this function is called when selected datasets in the "/results" page
     """
-    DATASET = os.path.join(app.config['HBCGM_DIR'], uid)
+    DATASET = os.path.join(app.config['HBCGM_DATA'], uid)
     return jsonify(get_data(DATASET))
 
 @app.route('/graph')
@@ -246,7 +246,7 @@ def graph():
     read dataset and render page when open url "/graph". This page could select all datasets that avaible to show
     """
     graph_data_dict = get_common_neigbhor_subgraph(GENE_MESH_GRAPH, "23411", "D006311")
-    g = GNNHapGraph(data_dir=app.config['GRAPH_DIR'], dataset=None, graph_data_dict=graph_data_dict)
+    g = GNNHapGraph(data_dir=app.config['GRAPH_DATA'], dataset=None, graph_data_dict=graph_data_dict)
     layout = g.build_graph()
     js_resources = INLINE.render_js()
     css_resources = INLINE.render_css()
@@ -288,12 +288,12 @@ def graph_uid(uid):
     """
     read dataset and render page when open url "/graph/<uid>"
     """
-    data_dir = app.config['GRAPH_DIR']
+    data_dir = app.config['GRAPH_DATA']
     if uid.endswith(".gnn.txt"): # dirty trick if select new dataset when in page "/graph/<uid>"
         _uid = uid.split(".")[0]
         # data_dir = os.path.join(data_dir, _uid)
         #TODO: read results in a subfolder
-        df = pd.read_table(os.path.join(app.config['GRAPH_DIR'], uid))
+        df = pd.read_table(os.path.join(app.config['GRAPH_DATA'], uid))
         df['GeneName'] = df['#GeneName'].apply(get_html_links)
         return jsonify({'url': f"/GRAPH_DATA/{uid}",
                         'data': df.to_dict(orient='list')})
@@ -321,7 +321,7 @@ def data_uid(uid):
     """
     ## must have data directory
     if not uid.endswith(".gnn.txt"): uid = uid + ".gnn.txt"
-    df = pd.read_table(os.path.join(app.config['GRAPH_DIR'], uid))
+    df = pd.read_table(os.path.join(app.config['GRAPH_DATA'], uid))
 
     return jsonify({'url': f"/GRAPH_DATA/{uid}",
                     'data': df.to_dict(orient='list')})
@@ -371,9 +371,53 @@ def graph_process(gene, meshid):
     #                 'edge_data': edge_data,
     #                 'graph_layout': graph_layout })
 
+@app.route('/haplotype')
+def haplotype():
+    table = "<p>This is a demo Page. To get SNP view, please redirect to Results page</p>"
+    roi = url_for('static', filename='roi.bed')
+    html = render_template('haplotype.html', 
+                           snp_view=table, 
+                           position="19:43800045-43806998", 
+                           roi=roi).encode(encoding='UTF-8')
+    return html
+
+
+@app.route('/haploblock/<dataset>_<position>_<blockStart>_<blockSize>_<pattern>')
+def haploblock(dataset, position, blockStart, blockSize, pattern):
+    pat = re.compile("MPD_(.+)_(\w+).results.mesh.txt")
+    chrom = position.split(":")[0] # position pattern: 19:43800045-43806998
+    if not chrom.lower().startswith("chr"):
+        chrom = "chr"+chrom
+    if pat.search(dataset):
+        uid, vartype = pat.search(dataset).groups()
+        data_path =  os.path.join(app.config['HBCGM_DATA'], dataset)
+        haplo_path = os.path.join(app.config['HBCGM_DATA'], "MPD_"+uid, f"{chrom}.{vartype}.haplotypes.txt")
+        if not os.path.exists(haplo_path): # walk to next level if not exist
+            haplo_path = os.path.join(app.config['HBCGM_DATA'], uid, "MPD_"+uid, f"{chrom}.{vartype}.haplotypes.txt")
+            data_path =  os.path.join(app.config['HBCGM_DATA'], uid, dataset)
+
+        headers = []
+        with open(data_path, 'r') as d:
+            for i, line in enumerate(d):
+                if line.startswith("#"):
+                    headers.append(line.strip("\n#").split("\t"))
+                if i == 6: break
+        table, bed = snp_view(data_path=haplo_path,
+                         pattern=pattern, 
+                         chrom=chrom, 
+                         bstart=blockStart, 
+                         bsize=blockSize, 
+                         strains=headers[3])
+        # write this temp file. only used for highlight haplotype blocks in the genome view
+        roi = url_for('static', filename='roi.bed') # critical to use url_for here to enable http get access the file
+        with open(os.path.join(request.script_root, "static/roi.bed"), 'w') as _roi:
+            _roi.writelines(bed)
+        html = render_template('haplotype.html', snp_view=table, position=position, roi=roi).encode(encoding='UTF-8')
+        return html
+
 
 if __name__ == '__main__':
-    app.run(debug=False, 
+    app.run(debug=True, 
             host="peltz-app-03",
             #host="0.0.0.0", 
             port=5006)

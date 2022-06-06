@@ -140,7 +140,7 @@ rule annotateSNPs:
     input: 
         vep = os.path.join(VEP_DIR, "chr{i}.pass.vep.txt"),
         strains = "trait.{ids}.txt",
-    output: "MPD_{ids}/Annotation/chr{i}.snp.genename.txt"
+    output: "MPD_{ids}/Annotation/chr{i}.snp.annot.txt"
     params:
         bin = HBCGM_BIN,
     shell:
@@ -150,7 +150,7 @@ rule annotateINDELs:
     input: 
         vep = os.path.join(VEP_DIR, "chr{i}.pass.vep.txt"),
         strains = "trait.{ids}.txt",
-    output: "MPD_{ids}/Annotation/chr{i}.indel.genename.txt"
+    output: "MPD_{ids}/Annotation/chr{i}.indel.annot.txt"
     params:
         bin = HBCGM_BIN,
     shell:
@@ -161,14 +161,14 @@ rule eblocks:
     input: 
         snps = os.path.join(SNPDB,"chr{i}.snp.txt"),
         indels = os.path.join(SNPDB,"chr{i}.indel.txt"),
-        gene_anno = "MPD_{ids}/Annotation/chr{i}.snp.genename.txt",
-        gene_annoi = "MPD_{ids}/Annotation/chr{i}.indel.genename.txt",
+        gene_anno = "MPD_{ids}/Annotation/chr{i}.snp.annot.txt",
+        gene_annoi = "MPD_{ids}/Annotation/chr{i}.indel.annot.txt",
         strains = "trait.{ids}.txt",
     output: 
         hb = "MPD_{ids}/chr{i}.snp.hblocks.txt",
         hbi = "MPD_{ids}/chr{i}.indel.hblocks.txt",
-        xhb = temp("MPD_{ids}/chr{i}.snp.hblocks.temp.txt"),
-        xhbi = temp("MPD_{ids}/chr{i}.indel.hblocks.temp.txt"),
+        xhb = "MPD_{ids}/chr{i}.snp.haplotypes.txt",
+        xhbi = "MPD_{ids}/chr{i}.indel.haplotypes.txt",
     params:
         bin = HBCGM_BIN,
     log: "logs/MPD_{ids}.chr{i}.eblocks.log"

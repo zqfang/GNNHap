@@ -3,7 +3,7 @@ function table_to_csv(source) {
     var columns = source.columns() //
     const nrows = source.get_length()
     // const lines = [columns.join(',')]
-    const ignore = ["LitScore", "CodonColor", "index","logPvalue","PubMed","Haplotype"]
+    const ignore = ["LitScore", "CodonColor", "index","logPvalue","PubMed","Haplotype", "Position"]
     const lines = [columns.filter(function(str){return ignore.indexOf(str) < 0;}).join('\t')]
     for (let i = 0; i < nrows; i++) {
         let row = [];
