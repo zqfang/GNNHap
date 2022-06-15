@@ -22,8 +22,8 @@ app.config.from_file("config.json", load=json.load)
 TRAIT_DATA = {}
 MESH_TERM = ""
 GENE_SYMBOL = ""
-#GENE_MESH_GRAPH = nx.read_gpickle(app.config['GENE_MESH_GRAPH'])
 GENE_MESH_GRAPH = ""
+GENE_MESH_GRAPH = nx.read_gpickle(app.config['GENE_MESH_GRAPH'])
 
 @app.route('/', methods=['GET', 'POST'])
 def index(): 
@@ -392,22 +392,31 @@ def haploblock(dataset, position, blockStart, blockSize, pattern):
         uid, vartype = pat.search(dataset).groups()
         data_path =  os.path.join(app.config['HBCGM_DATA'], dataset)
         haplo_path = os.path.join(app.config['HBCGM_DATA'], "MPD_"+uid, f"{chrom}.{vartype}.haplotypes.txt")
+        trait_path = os.path.join(app.config['HBCGM_DATA'], "MPD_"+uid, f"trait.{uid}.txt")
         if not os.path.exists(haplo_path): # walk to next level if not exist
             haplo_path = os.path.join(app.config['HBCGM_DATA'], uid, "MPD_"+uid, f"{chrom}.{vartype}.haplotypes.txt")
             data_path =  os.path.join(app.config['HBCGM_DATA'], uid, dataset)
-
+            trait_path = os.path.join(app.config['HBCGM_DATA'], uid, "MPD_"+uid, f"trait.{uid}.txt")
+        ## read strain names which sorted by trait 
         headers = []
         with open(data_path, 'r') as d:
             for i, line in enumerate(d):
                 if line.startswith("#"):
                     headers.append(line.strip("\n#").split("\t"))
                 if i == 6: break
+        ## read strain names for haplotypes.txt
+        haplo_strains = [] 
+        with open(trait_path, 'r') as t:
+            for line in t:
+                s = line.strip().split()[0]
+                haplo_strains.append(s)
         table, bed = snp_view(data_path=haplo_path,
                          pattern=pattern, 
                          chrom=chrom, 
                          bstart=blockStart, 
                          bsize=blockSize, 
-                         strains=headers[3])
+                         strains=headers[3], 
+                         haplo_strains=haplo_strains)
         # write this temp file. only used for highlight haplotype blocks in the genome view
         roi = url_for('static', filename='roi.bed') # critical to use url_for here to enable http get access the file
         with open(os.path.join(request.script_root, "static/roi.bed"), 'w') as _roi:
@@ -417,7 +426,7 @@ def haploblock(dataset, position, blockStart, blockSize, pattern):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, 
+    app.run(debug=False, 
             host="peltz-app-03",
             #host="0.0.0.0", 
             port=5006)

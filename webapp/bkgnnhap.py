@@ -598,7 +598,7 @@ class GNNHapGraph(Graph):
         self.view = CDSView(source=self.source, filters=[self.bool_filter, self.group_filter ])
 
         ## Datatable
-        self._columns = ["GeneName", "HumanEntrezID", "MeSH_Terms", "LiteratureScore", "PubMedID"] 
+        self._columns = ["GeneName", "HumanEntrezID", "MeSH_Terms", "LiteratureScore", "PubMedID", "IND"] 
         columns = [ TableColumn(field=c, title=c, formatter=HTMLTemplateFormatter()) for c in self._columns ] # skip index                      
         self.myTable = DataTable(source=self.source, columns=columns, 
                             width =600, height = 500, index_position=0,
@@ -636,7 +636,16 @@ class GNNHapGraph(Graph):
                                         var new_arr = Array.from(new_set);   
                                         meshid.options = new_arr;
                                         meshid.value = new_arr[0];  
-                                        group_filt.group = meshid.value;    
+                                        group_filt.group = meshid.value;   
+                                        source.data['GeneName'] = source.data['#GeneName'];
+
+                                        for (var j=0; j < source.data['GeneName'].length; j++)
+                                        {
+                                            var gn = source.data['GeneName'][j];
+                                            var ge = source.data['HumanEntrezID'][j];
+                                            var ps = `<a href="https://www.ncbi.nlm.nih.gov/gene/${ge}" target="_blank">${gn}</a>`;
+                                            source.data['GeneName'][j] = ps;
+                                        }
                                     }        
                                 }
                                 // Send a request

@@ -308,7 +308,7 @@ def get_common_neigbhor_subgraph(H, entrezid, meshid):
 
 
 
-def snp_view(data_path, pattern=None, chrom=19, bstart=36449, bsize=5, strains=None):
+def snp_view(data_path, pattern=None, chrom=19, bstart=36449, bsize=5, strains=None, haplo_strains=None):
     """
     show snp table view
     Args:
@@ -322,7 +322,6 @@ def snp_view(data_path, pattern=None, chrom=19, bstart=36449, bsize=5, strains=N
         bed:  red file of haplotyepblock
     """
     # Retrieve the desired SNPs from the database file.
-    print(data_path)
     if data_path is None:
         data_path = "/data/bases/shared/haplomap/HBCGM_DATA/MPD_24412-f/chr19.indel.haplotypes.txt"
     # haplob = pd.read_table(data_path, header=None, usecols=range(6))
@@ -338,31 +337,36 @@ def snp_view(data_path, pattern=None, chrom=19, bstart=36449, bsize=5, strains=N
 
     ## Read file block
     assert start < end
+    # add headings for each strain abbrev
+    HEADER_STRAINS = strains
+    HAPLO_STRAINS = haplo_strains
+    if strains is None:
+        HEADER_STRAINS = range(len(pattern))
+
+    if haplo_strains is None:
+        HAPLO_STRAINS = range(len(pattern))
+    ## strains num must be equal
+    assert len(strains) == len(haplo_strains)
+
+    for p, strain in zip(pattern, HEADER_STRAINS):
+        c = dict_color[p]
+        table +=f"<TH class=\"verticalTableHeader\" halign=\"left\" height=\"50\" valign=\"bottom\" style=\"background-color:{c}\"><span>{STRAINS[strain]}</span></TH>"
+    table += "<TH valign=\"bottom\">Gene</TH><TH valign=\"bottom\">Annotation</TH></TR></thead><tbody><TR>"
+    # read file block
     fh = open(data_path, 'r')
     snp_block = itertools.islice(fh, start, end)
-    rows = []
+    bed = [] # Chr, ChrStart, ChrEnd, Name
     for line in snp_block:
-        rows.append(line.strip().split())
-
-    # add headings for each strain abbrev
-    _STRAINS = strains
-    if strains is None:
-        _STRAINS = rows[0][3]
-    for p, strain in zip(pattern, _STRAINS):
-        c = dict_color[p]
-        table +=f"<TH class=\"verticalTableHeader\" halign=\"left\" height=\"50\" valign=\"bottom\" style=\"background-color:{c}\"><span>{strain}</span></TH>"
-    table += "<TH valign=\"bottom\">Gene</TH><TH valign=\"bottom\">Annotation</TH></TR></thead><tbody><TR>"
-    
-    bed = [] # Chr, ChrStart, ChrEnd
-    for row in rows:
+        row = line.strip().split()
         snpChr, snpPos, snpID, snpAlleles = row[:4]
         snpID = snpID.rstrip("_")
         table = table + f"<TD halign=\"center\" >{snpID}</TD>" +\
                         f"<TD halign=\"center\" >{snpChr}</TD>" +\
                         f"<TD halign=\"center\" >{snpPos}</TD>"
         # write snp allelle
-        for a in snpAlleles: 
-            c = '#ffffff'
+        for s in HEADER_STRAINS:
+            a = snpAlleles[HAPLO_STRAINS.index(s)] ## note: match the order of alleles to header 
+            c = '#ffffff' # {'P':'#D13917', 'A': '#4C4A4B', 'M':'#ffffff', '-':'#ffffff'}
             if a == '0':
                 c = '#dddcdd'
             elif a == '1':
@@ -376,8 +380,12 @@ def snp_view(data_path, pattern=None, chrom=19, bstart=36449, bsize=5, strains=N
             snpGene = "<br>".join(row[slice(4, len(row), 2)])
             snpGeneAnno = "<br>".join(row[slice(5, len(row), 2)])
         table += f"<TD halign=\"center\" >{snpGene}</TD><TD halign=\"center\" >{snpGeneAnno}</TD></TR>\n"
+        tmp = snpID.split("_") # var, chrom, start, size, type
         snpEnd = int(snpPos) - 1
         snpStart = snpEnd -1 
+        if (not snpID.startswith("SNP")) and (len(tmp) > 3):
+            snpStart = int(tmp[2]) - 1 # for bed file
+            snpEnd = snpStart + int(tmp[3])
         _bed = f"{snpChr}\t{snpStart}\t{snpEnd}\t"
         if len(snpGene) > 0:
             _bed += f"{snpGene};{snpGeneAnno}"

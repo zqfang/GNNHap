@@ -42,30 +42,16 @@ function injectToInputs(event)
     var inputs = results[i].split(delimiter);
     //console.log(inputs);
     // set input value
+    if (document.getElementById(inputs[0]) !== null )
+    {
     document.getElementById(inputs[0]).setAttribute('value', inputs[inputs.length -1]);
+    }
+    else
+    {
+      alert(`Please input correct Strain Abbreviation Name: ${inputs[0]} `);
+      break;
+    }
   }
 
 }
-
-// // read local file in the server side
-// function readTxtDoc() 
-// {
-
-//   // code for IE7+, Firefox, Chrome, Opera, Safari
-//   // Create an XMLHttpRequest object
-//   var xmlhttp = new XMLHttpRequest();
-//   // Define a callback function
-//   xmlhttp.onload = function() {
-//       if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
-//           // Here you can use the Data
-//           document.getElementById("msgh2").innerHTML = xmlhttp.responseText;
-//       }
-//   }
-
-//   // Send a request
-//   xmlhttp.open("GET", "data.txt", true);
-//   xmlhttp.send();
-// }
-
-
   
