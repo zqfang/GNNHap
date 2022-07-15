@@ -1,10 +1,11 @@
 import os, glob
+from attr import field
 import numpy as np
 import pandas as pd
 import networkx as nx
 
 from bokeh.plotting import figure, from_networkx
-from bokeh.models import ColumnDataSource, TableColumn, DataTable, HTMLTemplateFormatter, CellFormatter
+from bokeh.models import ColumnDataSource, TableColumn, DataTable, HTMLTemplateFormatter, CellFormatter, ScientificFormatter, NumberFormatter
 from bokeh.models import RangeSlider, CDSView, BooleanFilter, GroupFilter, CustomJS, Legend
 from bokeh.models.widgets import Select, TextInput, AutocompleteInput, Div, Button
 from bokeh.layouts import column, row
@@ -193,13 +194,28 @@ class GNNHapResults(Graph):
         self.view = CDSView(source=self.source, filters=[self.bool_filter, self.group_filter ])
 
         ## Datatable
-        columns = ['GeneName', 'CodonFlag','Haplotype','EffectSize', 'Pvalue', 'FDR',
-                'PopPvalue', 'PopFDR', 'Position', 'LitScore','PubMed'] # 'Chr', 'ChrStart', 'ChrEnd'
-        columns = [ TableColumn(field=c, title=c, formatter=HTMLTemplateFormatter() 
-                                if c in ['Haplotype','GeneName', 'PubMed', 'Position'] else CellFormatter()) for c in columns ] # skip index  
+        _columns = ['GeneName', 'CodonFlag','Haplotype', 'EffectSize', 'Pvalue', 'FDR',
+                    'PopPvalue', 'PopFDR', 'Position', 'LitScore','PubMed'] # 'Chr', 'ChrStart', 'ChrEnd'
+        columns = []
+        for c in _columns:
+            if c in ['Haplotype','GeneName', 'PubMed', 'Position']:
+                col = TableColumn(field=c, title=c, formatter=HTMLTemplateFormatter()) 
+            elif c in ['Pvalue', 'FDR', 'PopPvalue', 'PopFDR']:
+                col = TableColumn(field=c, title=c, formatter=ScientificFormatter(precision=2)) 
+            elif c in ['EffectSize', 'LitScore']:
+                col = TableColumn(field=c, title=c, formatter=NumberFormatter(format="0.000")) 
+            else:
+                col = TableColumn(field=c, title=c, formatter=CellFormatter()) 
+            columns.append(col)
+              
+        # columns = [ TableColumn(field=c, title=c, formatter=HTMLTemplateFormatter() 
+        #                         if c in ['Haplotype','GeneName', 'PubMed', 'Position'] else CellFormatter()) for c in columns ] # skip index  
         self.columns = columns                     
-        self.myTable = DataTable(source=self.source, columns=columns, width =1200, height = 400, index_position=0,
-                            editable = True, view=self.view, name="DataTable",sizing_mode="stretch_width") # autosize_mode="fit_viewport"
+        self.myTable = DataTable(source=self.source, columns=columns, width =1200, height = 400, 
+                            index_position=0,
+                            editable = True, view=self.view, 
+                            name="DataTable",
+                            sizing_mode="stretch_width") # autosize_mode="fit_viewport"
         
 
         # download

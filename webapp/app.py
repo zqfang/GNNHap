@@ -396,7 +396,7 @@ def haploblock(dataset, position, blockStart, blockSize, pattern):
         if not os.path.exists(haplo_path): # walk to next level if not exist
             haplo_path = os.path.join(app.config['HBCGM_DATA'], uid, "MPD_"+uid, f"{chrom}.{vartype}.haplotypes.txt")
             data_path =  os.path.join(app.config['HBCGM_DATA'], uid, dataset)
-            trait_path = os.path.join(app.config['HBCGM_DATA'], uid, "MPD_"+uid, f"trait.{uid}.txt")
+            trait_path = os.path.join(app.config['HBCGM_DATA'], uid, f"trait.{uid}.txt")
         ## read strain names which sorted by trait 
         headers = []
         with open(data_path, 'r') as d:

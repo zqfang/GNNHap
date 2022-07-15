@@ -64,15 +64,15 @@ table {
 
 th {
     padding: 10px;
-    text-align: left;
+    /*text-align: left; */
     background-color: #a7aba8;
     color: white;
   }
 
-th span { writing-mode: sideways-lr; /* +90°: use 'tb-rl' */
-          text-align: left;          /* +90°: use 'right' */
-          // padding:10px 5px 0; 
-}
+/* th span { writing-mode: sideways-lr; /* +90°: use 'tb-rl' */
+/*          text-align: left;          /* +90°: use 'right' */
+/*          // padding:10px 5px 0; 
+} */
 
 td {
     padding: 10px;
@@ -96,7 +96,7 @@ tr:hover {background-color: #C0D728;}
 
 .horizontal{
     float: left;
-    // border: 1px solid green
+    /* border: 1px solid green */
 }
 
 .horizontal  > *{
