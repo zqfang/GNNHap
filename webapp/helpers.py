@@ -205,7 +205,7 @@ def get_datasets(data_dir):
 
 def get_data(dataset):
     df, headers = load_ghmap(dataset)
-    df = df[df.CodonFlag>=0]
+    #df = df[df.CodonFlag>=0]
     if df.empty:
         print("No significant values loaded")
         return  

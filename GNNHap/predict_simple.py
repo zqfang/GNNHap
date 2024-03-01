@@ -191,10 +191,13 @@ class Simple:
 
         if self.mouse2human is None:
             case.loc[case.index, 'HumanEntrezID'] = case[g].map(self.symbol2entrez)
+            case.dropna(subset=['HumanEntrezID'], inplace=True)
         else: 
             case.loc[case.index, 'HumanEntrezID'] = case[g].map(self.mouse2human).map(self.symbol2entrez)
         case.loc[case.index, 'GNodeIDX'] = case['HumanEntrezID'].map(self.node2index['gene2nid'])
+        case.dropna(subset=['GNodeIDX'], inplace=True)
         case.loc[case.index, 'MNodeIDX'] = case[m].map(self.node2index['mesh2nid'])
+        case.dropna(subset=['MNodeIDX'], inplace=True)
         df = case.dropna(subset=['HumanEntrezID','GNodeIDX'])
         df.loc[df.index, 'GNodeIDX'] = df['GNodeIDX'].astype(int)
         df.loc[df.index, 'MNodeIDX'] = df['MNodeIDX'].astype(int)

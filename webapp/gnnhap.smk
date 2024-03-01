@@ -201,20 +201,20 @@ rule ghmap:
         cmd = "{params.bin}/haplomap ghmap %s "%categorical +\
               "-e {input.gene_exprs} -r {input.rel} " +\
               "-p {input.trait} -b {input.hb} -o {output.snps} " +\
-              "-n MPD_{wildcards.ids}%s -a -v > {log}"%cats
+              "-n MPD_{wildcards.ids}%s -v > {log}"%cats
         shell(cmd)
 
         cmd = "{params.bin}/haplomap ghmap %s "%categorical +\
                 "-e {input.gene_exprs} -r {input.rel} " +\
                 "-p {input.trait} -b {input.hbi} -o {output.indels} " +\
-                "-n MPD_{wildcards.ids}_indel%s -a -v > {log}"%cats
+                "-n MPD_{wildcards.ids}_indel%s -v > {log}"%cats
         shell(cmd)
 
 
 rule ghmap_aggregate:
     input: 
         res = ["MPD_{ids}/chr%s.snp.results.txt"%c for c in CHROMOSOMES] 
-    output: temp("MPD_{ids}_snp.results.txt")
+    output: "MPD_{ids}_snp.results.txt"
     run:
         # read input
         dfs = []
@@ -241,7 +241,7 @@ rule ghmap_aggregate:
 rule ghmap_aggregate_indel:
     input: 
         res = ["MPD_{ids}/chr%s.indel.results.txt"%c for c in CHROMOSOMES],
-    output: temp("MPD_{ids}_indel.results.txt")
+    output: "MPD_{ids}_indel.results.txt"
     run:
         # read input
         dfs = []

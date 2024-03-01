@@ -159,7 +159,7 @@ class GNNHapResults(Graph):
         global codon_flag
         # update new data
         df, headers = load_ghmap(os.path.join(self.DATA_DIR, dataset))
-        df = df[df.CodonFlag>=0]
+        # df = df[df.CodonFlag>=0]
         if df.empty:
             self.message.text = f"<p> Error: <br> Dataset is a Empty Table !!! <br> Please Input a new dataset name.</p>"
             return      
@@ -469,7 +469,8 @@ class GNNHapResults(Graph):
                 {
                     var pa = pax[j];
                     if (pa == "Indirect") continue;
-                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator/index.html?view=docsum&query=${pa}" target="_blank">${pa}</a>`;
+                    // https://www.ncbi.nlm.nih.gov/research/pubtator3/publication/14733962
+                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator3/publication/${pa}" target="_blank">${pa}</a>`;
                     pid_html.push(ps);
                 }
                 message.text = "<div><h3>PubMed Links:</h3><pre>" + pid_html.join(",") +"</pre></div>" ;
@@ -726,7 +727,7 @@ class GNNHapGraph(Graph):
                 {
                     var pa = pax[j];
                     if (pa == "Indirect") continue;
-                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator/index.html?view=docsum&query=${pa}" target="_blank">${pa}</a>`;
+                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator3/publication/${pa}" target="_blank">${pa}</a>`;
                     pid_html.push(ps);
                 }
                 message.text = "<pre><h3>PubMed Links:</h3><p>" + pid_html.join(",") +"</p></pre>"; 
@@ -822,7 +823,7 @@ class SubGraph(Graph):
                 {
                     var pa = papers[j];
                     if (pa == "Indirect") continue;
-                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator/index.html?view=docsum&query=${pa}" target="_blank">${pa}</a>`;
+                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator3/publication/${pa}" target="_blank">${pa}</a>`;
                     pid_html.push(ps);
                 }
                 message.text = "<div><h3>PubMed Links:</h3><pre>" + pid_html.join(",") +"</pre></div>" ;
@@ -857,7 +858,7 @@ class SubGraph(Graph):
                 {
                     var pa = papers[j];
                     if (pa == "Indirect") continue;
-                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator/index.html?view=docsum&query=${pa}" target="_blank">${pa}</a>`;
+                    var ps = `<a href="https://www.ncbi.nlm.nih.gov/research/pubtator3/publication/${pa}" target="_blank">${pa}</a>`;
                     pid_html.push(ps);
                 }
                 message.text = "<div><h3>PubMed Links:</h3><pre>" + pid_html.join(",") +"</pre></div>" ;

@@ -337,7 +337,7 @@ hbcgm = HBCGM(inputdir=HBCGM_RESULTS,
             mesh_nodes = mesh_nodes,
             pubmed_ids=pubmed_json)
 for p in path:
-    m = str(p).split("/")[-1].split(".")[0].split("_")[1] # mpd id
+    m = os.path.basename(str(p)).replace("MPD_", "").split(".")[0] # extract id
     m = m.split("-")[0] # strip suffix
     # print(f"Inference MPD: {m}")
     if os.path.exists(str(p).replace("txt","mesh.txt")): continue
