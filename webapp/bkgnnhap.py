@@ -196,20 +196,22 @@ class GNNHapResults(Graph):
         ## Datatable
         _columns = ['GeneName', 'CodonFlag','Haplotype', 'EffectSize', 'Pvalue', 'FDR',
                     'PopPvalue', 'PopFDR', 'Position', 'LitScore','PubMed'] # 'Chr', 'ChrStart', 'ChrEnd'
+        _columns = [ c for c in _columns if c in df.columns] # only select existed columns
+        statistics = ['Pvalue', 'FDR', 'PopPvalue', 'PopFDR'] # do not set precision
         columns = []
+        print("this is all the columns: ", _columns)
         for c in _columns:
             if c in ['Haplotype','GeneName', 'PubMed', 'Position']:
                 col = TableColumn(field=c, title=c, formatter=HTMLTemplateFormatter()) 
-            elif c in ['Pvalue', 'FDR', 'PopPvalue', 'PopFDR']:
-                col = TableColumn(field=c, title=c, formatter=ScientificFormatter(precision=2)) 
+            ## some dataset have columns with Pop*, while other no. So can not set precision on these columns
+            # elif c in statistics:
+            #     col = TableColumn(field=c, title=c, formatter=ScientificFormatter(precision=2)) 
             elif c in ['EffectSize', 'LitScore']:
-                col = TableColumn(field=c, title=c, formatter=NumberFormatter(format="0.000")) 
+                col = TableColumn(field=c, title=c, formatter=NumberFormatter(format="0.00")) 
             else:
                 col = TableColumn(field=c, title=c, formatter=CellFormatter()) 
             columns.append(col)
               
-        # columns = [ TableColumn(field=c, title=c, formatter=HTMLTemplateFormatter() 
-        #                         if c in ['Haplotype','GeneName', 'PubMed', 'Position'] else CellFormatter()) for c in columns ] # skip index  
         self.columns = columns                     
         self.myTable = DataTable(source=self.source, columns=columns, width =1200, height = 400, 
                             index_position=0,
@@ -217,7 +219,6 @@ class GNNHapResults(Graph):
                             name="DataTable",
                             sizing_mode="stretch_width") # autosize_mode="fit_viewport"
         
-
         # download
         self.button = Button(label="Download Table", button_type="success")
         self.barplot()
@@ -338,7 +339,7 @@ class GNNHapResults(Graph):
                             // updates
                             url = new_data['url'];
                             meshid.options =  Object.keys(new_data['mesh_terms']);
-                            impact.value = new_data['codon_flag']['1'];
+                            impact.value = new_data['codon_flag']['-1'];
                             impact.options =  Object.values(new_data['codon_flag']);
                             group_filt.group = impact.value;
                             bar.x_range.factors = new_data['strains'];
@@ -497,6 +498,7 @@ class GNNHapResults(Graph):
 
             var gene_id = source.data["HumanEntrezID"][selected_index];
             var mesh_id = mesh_terms.data[meshid.value][0];
+            
             // get json data
             $.getJSON(`/graph_process/${gene_id}_${mesh_id}`,
               function(data) {
@@ -652,7 +654,8 @@ class GNNHapGraph(Graph):
                                         var new_set = new Set( new_data['data']['MeSH_Terms'] );
                                         var new_arr = Array.from(new_set);   
                                         meshid.options = new_arr;
-                                        meshid.value = new_arr[0];  
+                                        meshid.value = new_arr[0]; 
+                                        console.log("Update table: " + meshid.value); 
                                         group_filt.group = meshid.value;   
                                         source.data['GeneName'] = source.data['#GeneName'];
 
@@ -668,7 +671,8 @@ class GNNHapGraph(Graph):
                                 // Send a request
                                 xmlhttp.open("GET", url, true);
                                 xmlhttp.send();
-                                source.change.emit();"""))
+                                source.change.emit();
+                                console.log("data update done");"""))
 
     def slider_update(self): # attr, old, new
         self.slider.js_on_change('value', 
@@ -694,7 +698,8 @@ class GNNHapGraph(Graph):
                     }  
                 }
                 filt.booleans = boo;
-                source.change.emit(); """))
+                source.change.emit(); 
+                console.log("slider update done");"""))
 
 
     def mesh_update(self):
@@ -706,6 +711,7 @@ class GNNHapGraph(Graph):
                                 filt.column_name = "MeSH_Terms";
                                 filt.group = imp;
                                 source.change.emit();
+                                console.log("mesh update done");
                                 """))
 
     ### setup callbacks
@@ -745,6 +751,7 @@ class GNNHapGraph(Graph):
             source.change.emit();
             graph.change.emit();
             genemeshplot.change.emit();
+            console.log("graph update done");
         """))
 
     def build_graph(self):

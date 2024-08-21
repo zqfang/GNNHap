@@ -1,4 +1,4 @@
-
+import sys
 from ast import Sub
 import os, uuid, subprocess, re, json, tempfile
 import numpy as np
@@ -426,7 +426,10 @@ def haploblock(dataset, position, blockStart, blockSize, pattern):
 
 
 if __name__ == '__main__':
-    app.run(debug=False, 
+    mode_debug = False
+    if len(sys.argv) > 1:
+        mode_debug = True
+    app.run(debug=mode_debug, 
             host="peltz-app-03",
             #host="0.0.0.0", 
             port=5006)

@@ -145,9 +145,9 @@ def load_ghmap(dataset):
     df['Position'] = df.apply(get_hblock_links, args=(os.path.basename(dataset),),axis=1)
     # dataset_name, codon_flag, gene_expr_order, strains, traits, mesh_terms = headers[:6]
     headers[2] = headers[2][-1].split(";")
- 
+    ## codonflag
     cf = [s.split(":") for s in headers[1][1:]]
-    headers[1] = {k:v for k, v in cf}
+    headers[1] = {k:v for k, v in cf if not k.startswith("$")}
     if len(headers) == 7: # dataset with MeSH_Terms
         mesh_terms = [s.split(":") for s in headers[5][1:]]
         mesh_terms = {v:k for k, v in mesh_terms}
