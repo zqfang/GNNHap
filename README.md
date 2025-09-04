@@ -24,13 +24,20 @@ Graph Neural Network based Haplotype Prioritization for inbred mouse.
     ```
 
 
+
+you can create the conda env with `gnnhap.env.yml`
+```bash
+mamba env create -f gnnhap.env.yml
+```
+
 ## Build Graph and Train Model
 
 if you would like to use our pretrain model, go to the prediction step or `web interface` step.
 
-#### 1. Download files
+#### 1. Bulk Download Pubmed Abstracts and gene info
 
-see Download.md
+see [Download.md](./Download.md)
+
 #### 2. Build Knowlege graph
 ```shell
 snakemake -s graph/pubmed_graph_parallel.smk -p -j 32
